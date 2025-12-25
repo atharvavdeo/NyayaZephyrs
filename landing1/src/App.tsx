@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import { cn } from "@/lib/utils";
 import { GET_DASHBOARD } from "./graphql/client";
@@ -711,7 +711,95 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     { role: "ai", content: "Hello! Upload a legal document to get started. I can analyze judgments, contracts, and legal notices." }
   ]);
   const [inputMessage, setInputMessage] = useState("");
-  const documentLibraryData = documentLibrary; // Fallback to mock data for consistent UI
+  const [dbDocuments, setDbDocuments] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+  const [showFullSummary, setShowFullSummary] = useState(false);
+
+  // Manual re-analyze function
+  const handleReanalyze = async () => {
+    if (!sessionId) return;
+    setProcessing(true);
+    try {
+      const response = await fetch(`http://localhost:8000/reanalyze/${sessionId}`, { method: "POST" });
+      if (response.ok) {
+        const data = await response.json();
+        setMetadata(data.metadata);
+        setMessages(prev => [...prev, { role: "ai", content: "✅ Document re-analyzed successfully! Summary and metadata updated." }]);
+      } else {
+        setMessages(prev => [...prev, { role: "ai", content: "❌ Re-analysis failed. Please try again." }]);
+      }
+    } catch (error) {
+      console.error("Re-analyze failed:", error);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Fetch documents from database on mount
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/documents");
+        if (response.ok) {
+          const data = await response.json();
+          setDbDocuments(data.documents || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch documents:", error);
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+    fetchDocuments();
+  }, []);
+
+  // Handle clicking on a previous document to load its data
+  const handleLoadDocument = async (doc: any) => {
+    setProcessing(true);
+    try {
+      // Fetch document metadata from the metadata endpoint
+      let metaResponse = await fetch(`http://localhost:8000/metadata/${doc.file_hash}`);
+      if (metaResponse.ok) {
+        let metaData = await metaResponse.json();
+        console.log("Received metadata:", metaData);
+        console.log("Setting metadata.metadata:", metaData.metadata);
+
+        // Use cached metadata from database (no auto-reanalysis)
+        // User can manually trigger re-analysis using the Analyze button if needed
+
+        setSessionId(doc.file_hash);
+        setMetadata(metaData.metadata);
+        console.log("Metadata state updated");
+
+        // Set file preview URL if file exists in data folder
+        setFileUrl(`http://localhost:8000/files/${doc.file_hash}`);
+
+        // Fetch chat history
+        const historyResponse = await fetch(`http://localhost:8000/history/${doc.file_hash}`);
+        if (historyResponse.ok) {
+          const historyData = await historyResponse.json();
+          const chatMessages = historyData.messages?.map((msg: any) => ({
+            role: msg.role === "assistant" ? "ai" : msg.role,
+            content: msg.content
+          })) || [];
+
+          // Set initial message if no chat history
+          if (chatMessages.length === 0) {
+            setMessages([
+              { role: "ai", content: `📋 **Loaded: ${doc.filename}**\n\n💬 You can now ask questions about this document.` }
+            ]);
+          } else {
+            setMessages(chatMessages);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load document:", error);
+      setMessages([{ role: "ai", content: "Failed to load document. Please try again." }]);
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -747,10 +835,10 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       setSessionId(data.file_hash);
       setMetadata(data.metadata);
 
-      // Add initial analysis message
+      // Add initial analysis message - kept simple
       setMessages(prev => [...prev, {
         role: "ai",
-        content: `I've analyzed **${file.name}**. \n\n**Case**: ${data.metadata?.case_title || "Unknown"}\n**Verdict**: ${data.metadata?.verdict || "Not specified"}\n\nYou can now ask questions about this document.`
+        content: `📋 **Document Analyzed: ${file.name}**\n\n💬 You can now ask questions about this document.`
       }]);
 
     } catch (error) {
@@ -922,6 +1010,24 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
                       <p className="text-[#1a1a1a] text-sm">{metadata.judge}</p>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div className="p-2 bg-white/50 rounded border border-[#d4cdb8]">
+                        <p className="text-[10px] uppercase text-[#8b7355] font-bold">APPELLANT</p>
+                        <p className="text-[#1a1a1a] text-sm">{metadata.appellant || "Not specified"}</p>
+                      </div>
+                      <div className="p-2 bg-white/50 rounded border border-[#d4cdb8]">
+                        <p className="text-[10px] uppercase text-[#8b7355] font-bold">RESPONDENT</p>
+                        <p className="text-[#1a1a1a] text-sm">{metadata.respondent || "Not specified"}</p>
+                      </div>
+                    </div>
+
+                    {metadata.victim && metadata.victim !== "Not specified" && metadata.victim !== "Not applicable" && (
+                      <div className="p-2 bg-red-50/50 rounded border border-red-200 mt-3">
+                        <p className="text-[10px] uppercase text-red-700 font-bold">VICTIM</p>
+                        <p className="text-red-800 text-sm font-medium">{metadata.victim}</p>
+                      </div>
+                    )}
+
                     <div className="mt-4">
                       <p className="text-[11px] uppercase tracking-wider text-[#8b7355] font-bold mb-2">SUMMARY</p>
                       <p className="text-[14px] text-[#333] leading-relaxed text-justify" style={{ fontFamily: "Georgia, serif" }}>
@@ -935,6 +1041,25 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
                         {metadata.verdict}
                       </p>
                     </div>
+
+                    {/* Action Buttons */}
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={handleReanalyze}
+                        disabled={processing}
+                        className="px-3 py-1.5 bg-[#f97316] text-white rounded text-xs font-medium hover:bg-[#ea580c] transition-colors disabled:opacity-50"
+                      >
+                        {processing ? "Analyzing..." : "🔄 Re-Analyze"}
+                      </button>
+                      {metadata.detailed_summary && metadata.detailed_summary.length > 100 && (
+                        <button
+                          onClick={() => setShowFullSummary(true)}
+                          className="px-3 py-1.5 bg-[#6b5744] text-white rounded text-xs font-medium hover:bg-[#5a4838] transition-colors"
+                        >
+                          📖 Full Summary
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
@@ -946,6 +1071,44 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               </div>
             </motion.div>
           </div>
+
+          {/* Full Summary Modal */}
+          {showFullSummary && metadata && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowFullSummary(false)}>
+              <div className="bg-[#f5f1e8] rounded-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-serif italic text-[#1a1a1a]">Detailed Case Summary</h2>
+                  <button onClick={() => setShowFullSummary(false)} className="text-[#666] hover:text-[#1a1a1a]">✕</button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs uppercase text-[#8b7355] font-bold mb-1">Case</p>
+                    <p className="text-lg font-serif italic">{metadata.parties || metadata.case_title}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-[#8b7355] font-bold mb-1">Summary</p>
+                    <p className="text-[#333] leading-relaxed" style={{ fontFamily: "Georgia, serif" }}>{metadata.detailed_summary}</p>
+                  </div>
+                  {metadata.facts && metadata.facts !== "See summary" && (
+                    <div>
+                      <p className="text-xs uppercase text-[#8b7355] font-bold mb-1">Key Facts</p>
+                      <p className="text-[#333] leading-relaxed">{metadata.facts}</p>
+                    </div>
+                  )}
+                  {metadata.reasoning && metadata.reasoning !== "See summary" && (
+                    <div>
+                      <p className="text-xs uppercase text-[#8b7355] font-bold mb-1">Legal Reasoning</p>
+                      <p className="text-[#333] leading-relaxed">{metadata.reasoning}</p>
+                    </div>
+                  )}
+                  <div className="bg-[#f97316]/10 p-3 rounded">
+                    <p className="text-xs uppercase text-[#f97316] font-bold mb-1">Verdict</p>
+                    <p className="text-[#f97316] font-bold">{metadata.verdict}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Chatbot Section */}
           <motion.div
@@ -1034,22 +1197,32 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>Previous Documents</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {documentLibraryData.map((doc: any, idx: number) => (
-                <div key={idx} className="bg-[#f5f1e8] rounded-lg p-4 flex items-center justify-between hover:bg-[#ebe5d8] transition-colors cursor-pointer group">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#e5ddd0] rounded text-[#f97316] group-hover:text-white group-hover:bg-[#f97316] transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+              {loadingDocs ? (
+                <div className="col-span-3 text-center py-8 text-[#666]">Loading documents...</div>
+              ) : dbDocuments.length === 0 ? (
+                <div className="col-span-3 text-center py-8 text-[#666]">No documents uploaded yet. Upload a PDF to get started.</div>
+              ) : (
+                dbDocuments.map((doc: any, idx: number) => (
+                  <div
+                    key={doc.file_hash || idx}
+                    onClick={() => handleLoadDocument(doc)}
+                    className="bg-[#f5f1e8] rounded-lg p-4 flex items-center justify-between hover:bg-[#ebe5d8] transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-[#e5ddd0] rounded text-[#f97316] group-hover:text-white group-hover:bg-[#f97316] transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-[14px] font-medium text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>{doc.filename || doc.case_title || "Untitled Document"}</p>
+                        <p className="text-[12px] text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>PDF • {doc.case_title ? doc.case_title.substring(0, 30) + "..." : "Legal Document"}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[14px] font-medium text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>{doc.name}</p>
-                      <p className="text-[12px] text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>PDF • 2.4 MB</p>
-                    </div>
+                    <span className="text-[12px] text-[#999]" style={{ fontFamily: "Montserrat, sans-serif" }}>{doc.upload_date ? new Date(doc.upload_date).toLocaleDateString() : "N/A"}</span>
                   </div>
-                  <span className="text-[12px] text-[#999]" style={{ fontFamily: "Montserrat, sans-serif" }}>{doc.date}</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </motion.div>
         </div>
@@ -1061,15 +1234,43 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 // Dashboard Page Component
 function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings") => void }) {
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
-  const { data, loading } = useQuery(GET_DASHBOARD);
+  const [dashboardStats, setDashboardStats] = useState({
+    documents_analyzed: 0,
+    queries_asked: 0,
+    time_saved_hours: 0,
+    time_saved_minutes: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  // Use GraphQL data or fallback to defaults
-  const timeSaved = data?.dashboard?.timeSaved || { hours: 127, period: "this month" };
-  const stats = data?.dashboard?.stats || { queries: 342, documents: 89, accuracy: 94.2 };
-  const calendarEventsData = data?.dashboard?.calendarEvents || calendarEvents;
-  const ongoingCasesData = data?.dashboard?.ongoingCases || ongoingCases;
-  const completedCasesData = data?.dashboard?.completedCases || completedCases;
-  const documentLibraryData = data?.dashboard?.documentLibrary || documentLibrary;
+  // Fetch real stats from backend
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/stats");
+        if (response.ok) {
+          const data = await response.json();
+          setDashboardStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch stats:", error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  // Use fetched stats with fallback
+  const timeSaved = { hours: dashboardStats.time_saved_hours, period: "total" };
+  const stats = {
+    queries: dashboardStats.queries_asked,
+    documents: dashboardStats.documents_analyzed,
+    accuracy: 94.2
+  };
+  const calendarEventsData = calendarEvents;
+  const ongoingCasesData = ongoingCases;
+  const completedCasesData = completedCases;
+  const documentLibraryData = documentLibrary;
 
   const getVerdictColor = (verdict: string) => {
     switch (verdict) {
