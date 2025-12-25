@@ -6,7 +6,6 @@ import { useQuery } from "@apollo/client/react";
 import { cn } from "@/lib/utils";
 import { GET_DASHBOARD } from "./graphql/client";
 import ClientsPage from "./ClientsPage";
-import LegalResearcherPage from "./LegalResearcherPage";
 
 interface Block {
   id: number;
@@ -429,7 +428,7 @@ const documentLibrary = [
 ];
 
 // Sidebar Component
-function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher"; onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "documents" | "my-cases" | "settings" | "clients"; onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients") => void }) {
   return (
     <div className="w-64 bg-[#f3eed2] border-r border-[#d4cdb8] flex flex-col h-screen fixed left-0 top-0 z-50">
       <div className="p-6 flex items-center gap-3">
@@ -501,18 +500,6 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
           </svg>
           <span style={{ fontFamily: "Montserrat, sans-serif" }}>Settings</span>
         </button>
-        <button
-          onClick={() => onNavigate("legal-researcher")}
-          className={cn(
-            "w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors",
-            activePage === "legal-researcher" ? "bg-[#e5ddd0] text-[#1a1a1a] font-medium border-l-4 border-[#f97316]" : "text-[#666] hover:bg-[#e5ddd0]/50"
-          )}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>Legal Research</span>
-        </button>
       </div>
 
       <div className="p-6 border-t border-[#d4cdb8]">
@@ -529,7 +516,7 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
 }
 
 // My Cases Page Component
-function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients") => void }) {
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
 
   return (
@@ -726,7 +713,7 @@ function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documen
 }
 
 // Documents Page Component
-function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients") => void }) {
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -1258,7 +1245,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 }
 
 // Dashboard Page Component
-function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients") => void }) {
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
   const [dashboardStats, setDashboardStats] = useState({
     documents_analyzed: 0,
@@ -2364,7 +2351,7 @@ function LandingPage({ onMeetCustomers, onDashboard }: { onMeetCustomers: () => 
 
 
 // Settings Page Component
-function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients") => void }) {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
       <Sidebar activePage="settings" onNavigate={onNavigate} />
@@ -2379,7 +2366,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docume
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher">("landing");
+  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "my-cases" | "settings" | "clients">("landing");
 
   if (currentPage === "clients") {
     return (
@@ -2412,19 +2399,6 @@ export default function App() {
     return <SettingsPage onNavigate={(page) => setCurrentPage(page)} />;
   }
 
-  if (currentPage === "legal-researcher") {
-    return (
-      <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
-        <Sidebar activePage="legal-researcher" onNavigate={(page) => setCurrentPage(page)} />
-        <div className="flex-1 relative z-10 ml-64">
-          <LegalResearcherPage />
-        </div>
-      </div>
-    );
-  }
-
   return <LandingPage onMeetCustomers={() => setCurrentPage("customers")} onDashboard={() => setCurrentPage("dashboard")} />;
 }
-
-
 
