@@ -633,14 +633,33 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
 
                   {researchResult.relevant_cases && researchResult.relevant_cases.length > 0 && (
                     <div>
-                      <h4 className="font-medium text-[#1a1a1a] mb-3">Relevant Cases</h4>
-                      <div className="space-y-3">
+                      <h4 className="font-medium text-[#1a1a1a] mb-3">📚 Relevant Cases ({researchResult.relevant_cases.length} found)</h4>
+                      <div className="space-y-4">
                         {researchResult.relevant_cases.map((caseInfo, idx) => (
-                          <div key={idx} className="bg-[#f5f1e8] p-4 rounded-lg border border-[#d4b896]/30">
-                            <a href={caseInfo.url} target="_blank" rel="noopener noreferrer" className="text-[#f97316] font-medium hover:underline">
-                              {caseInfo.title}
+                          <div key={idx} className="bg-white p-4 rounded-lg border border-[#d4b896] shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                              <a href={caseInfo.url} target="_blank" rel="noopener noreferrer" className="text-[#f97316] font-semibold hover:underline flex-1">
+                                {caseInfo.title}
+                              </a>
+                              {caseInfo.court && (
+                                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                                  {caseInfo.court}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-4 text-xs text-[#666] mb-2">
+                              {caseInfo.date && <span>📅 {caseInfo.date}</span>}
+                              {caseInfo.case_type && <span>📋 {caseInfo.case_type}</span>}
+                              {caseInfo.verdict && caseInfo.verdict !== "Not determined" && (
+                                <span className={`font-medium ${caseInfo.verdict.includes("Allowed") || caseInfo.verdict.includes("Acquitted") ? "text-green-600" : caseInfo.verdict.includes("Dismissed") || caseInfo.verdict.includes("Convicted") ? "text-red-600" : "text-gray-600"}`}>
+                                  ⚖️ {caseInfo.verdict}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-[#1a1a1a] leading-relaxed">{caseInfo.snippet}</p>
+                            <a href={caseInfo.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-2 inline-block">
+                              🔗 View Full Case on Indian Kanoon →
                             </a>
-                            <p className="text-sm text-[#1a1a1a] mt-2">{caseInfo.snippet}</p>
                           </div>
                         ))}
                       </div>

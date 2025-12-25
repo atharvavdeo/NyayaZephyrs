@@ -381,6 +381,11 @@ export interface CaseInfo {
   title: string;
   url: string;
   snippet: string;
+  court?: string;
+  date?: string;
+  case_type?: string;
+  verdict?: string;
+  ai_summary?: string;
 }
 
 export interface ResearchResult {
@@ -397,6 +402,27 @@ export interface ResearchResponse {
   message?: string;
 }
 
+// Backend response structure
+interface BackendCaseInfo {
+  url: string;
+  case_title: string;
+  court: string;
+  date: string;
+  case_type: string;
+  verdict: string;
+  parties: { petitioner: string; respondent: string };
+  summary: string;
+  ai_summary?: string;
+}
+
+interface BackendResearchResponse {
+  success: boolean;
+  client_name: string;
+  case_title: string;
+  results: BackendCaseInfo[];
+  total_found: number;
+}
+
 export async function conductResearch(data: ResearchRequest): Promise<ResearchResponse> {
   try {
     const response = await fetch(`${API_BASE}/research`, {
@@ -410,10 +436,60 @@ export async function conductResearch(data: ResearchRequest): Promise<ResearchRe
       return { success: false, message: errorData.detail || "Research failed" };
     }
     
-    const researchData = await response.json();
+    const backendData: BackendResearchResponse = await response.json();
+    
+    // Transform backend response to frontend format
+    const relevantCases: CaseInfo[] = backendData.results.map((r) => ({
+      title: r.case_title,
+      url: r.url,
+      snippet: r.ai_summary || r.summary,
+      court: r.court,
+      date: r.date,
+      case_type: r.case_type,
+      verdict: r.verdict,
+      ai_summary: r.ai_summary,
+    }));
+
+    // Extract legal principles from verdicts and case types
+    const legalPrinciples: string[] = [];
+    const seenPrinciples = new Set<string>();
+    backendData.results.forEach((r) => {
+      if (r.verdict && r.verdict !== "Not determined" && !seenPrinciples.has(r.verdict)) {
+        legalPrinciples.push(`${r.case_title}: ${r.verdict}`);
+        seenPrinciples.add(r.verdict);
+      }
+    });
+
+    // Generate summary from AI summaries
+    const summaryParts = backendData.results
+      .filter((r) => r.ai_summary)
+      .map((r) => r.ai_summary)
+      .slice(0, 3);
+    const summary = summaryParts.length > 0 
+      ? `Found ${backendData.total_found} relevant cases. ${summaryParts.join(" ")}`
+      : `Found ${backendData.total_found} relevant cases from Indian Kanoon.`;
+
+    // Generate strategy based on verdicts
+    const verdictCounts: Record<string, number> = {};
+    backendData.results.forEach((r) => {
+      if (r.verdict && r.verdict !== "Not determined") {
+        verdictCounts[r.verdict] = (verdictCounts[r.verdict] || 0) + 1;
+      }
+    });
+    const mostCommonVerdict = Object.entries(verdictCounts).sort((a, b) => b[1] - a[1])[0];
+    const recommendedStrategy = mostCommonVerdict 
+      ? `Based on similar cases, the most common outcome was "${mostCommonVerdict[0]}". Review the cited cases carefully and build your arguments around the established precedents.`
+      : `Review the ${backendData.total_found} cases found to identify applicable legal precedents and build your case strategy.`;
+
     return {
       success: true,
-      research: researchData,
+      research: {
+        query: data.description,
+        summary,
+        relevant_cases: relevantCases,
+        legal_principles: legalPrinciples,
+        recommended_strategy: recommendedStrategy,
+      },
     };
   } catch (error) {
     return { success: false, message: "Connection failed" };

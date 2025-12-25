@@ -18,6 +18,7 @@ interface StructuredData {
     legal_issues?: string[];
     summary?: string;
     evidence?: string[];
+    applicable_laws?: string[];
     recommended_action?: string;
 }
 
@@ -230,24 +231,78 @@ export default function ClientsPage() {
                         )}
                     </div>
 
-                    {/* Applicable Laws / Legal Issues */}
+                    {/* Legal Issues */}
                     <div className="bg-gradient-to-r from-purple-50 to-violet-50 p-5 rounded-lg border border-purple-200 shadow-sm">
                         <p className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <span className="text-base">⚖️</span> Applicable Laws & Issues
+                            <span className="text-base">📌</span> Key Legal Issues
                         </p>
                         {c.structured_data?.legal_issues && c.structured_data.legal_issues.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
+                            <ul className="space-y-2">
                                 {c.structured_data.legal_issues.map((issue: string, i: number) => (
-                                    <span key={i} className="bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full text-sm font-medium border border-purple-200">
-                                        {issue}
-                                    </span>
+                                    <li key={i} className="flex items-start gap-2 text-[#333]">
+                                        <span className="text-purple-600 font-bold">•</span>
+                                        <span>{issue}</span>
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         ) : (
                             <p className="text-gray-500 italic">No legal issues identified</p>
                         )}
                     </div>
                 </div>
+
+                {/* Applicable Laws Section */}
+                <div className="bg-gradient-to-r from-rose-50 to-pink-50 p-5 rounded-lg border border-rose-200 shadow-sm">
+                    <p className="text-xs font-bold text-rose-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span className="text-base">⚖️</span> Applicable Laws & Statutes
+                    </p>
+                    {c.structured_data?.applicable_laws && c.structured_data.applicable_laws.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                            {c.structured_data.applicable_laws.map((law: string, i: number) => {
+                                const colors = [
+                                    "bg-rose-100 text-rose-800 border-rose-300",
+                                    "bg-blue-100 text-blue-800 border-blue-300",
+                                    "bg-indigo-100 text-indigo-800 border-indigo-300",
+                                    "bg-violet-100 text-violet-800 border-violet-300",
+                                    "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300"
+                                ];
+                                return (
+                                    <span key={i} className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${colors[i % colors.length]}`}>
+                                        {law}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 italic">No applicable laws identified yet</p>
+                    )}
+                </div>
+
+                {/* Citations Section (from web scraping) */}
+                {c.citations && c.citations.length > 0 && (
+                    <div className="bg-gradient-to-r from-cyan-50 to-teal-50 p-5 rounded-lg border border-cyan-200 shadow-sm">
+                        <p className="text-xs font-bold text-cyan-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <span className="text-base">📚</span> Case Citations (via Web Research)
+                        </p>
+                        <div className="space-y-3">
+                            {c.citations.map((cite: any, i: number) => (
+                                <div key={i} className="bg-white p-3 rounded-lg border border-cyan-100 shadow-sm">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <p className="font-semibold text-[#1a1a1a] text-sm">{cite.case_title || cite.title || `Citation ${i+1}`}</p>
+                                        <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded">{cite.court || cite.case_type || "Legal"}</span>
+                                    </div>
+                                    {cite.ai_summary && <p className="text-xs text-gray-600 mt-1">{cite.ai_summary}</p>}
+                                    {cite.verdict && <p className="text-xs text-emerald-600 mt-1">Verdict: {cite.verdict}</p>}
+                                    {cite.url && (
+                                        <a href={cite.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                                            🔗 View Full Case
+                                        </a>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Recommended Actions */}
                 <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-5 rounded-lg border border-emerald-200 shadow-sm">
