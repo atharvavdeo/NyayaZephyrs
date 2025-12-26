@@ -1104,7 +1104,7 @@ def create_standalone_app() -> FastAPI:
 if __name__ == "__main__":
     import uvicorn
     
-    port = int(os.environ.get("LEGAL_API_PORT", 8001))
+    port = int(os.environ.get("LEGAL_API_PORT", 8000))
     host = os.environ.get("LEGAL_API_HOST", "0.0.0.0")
     
     print(f"""
