@@ -192,144 +192,130 @@ export default function ClientsPage() {
 
     // Render a complete case file card
     const renderCaseFile = (c: Case) => (
-        <div key={c.id} className="bg-white/90 rounded-xl border-2 border-[#d4b896] shadow-xl overflow-hidden mb-6">
+        <div key={c.id} className="bg-white rounded-xl border border-[#e5e0d5] shadow-sm overflow-hidden mb-6">
             {/* Case File Header */}
-            <div className="bg-gradient-to-r from-[#1a1a1a] to-[#333] text-white p-5">
+            <div className="bg-[#fcfaf7] px-6 py-4 border-b border-[#e5e0d5]">
                 <div className="flex justify-between items-start">
                     <div>
                         <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[#f97316] font-bold text-sm">📋 CLIENT CASE FILE</span>
-                            <span className="bg-[#f97316] text-white text-xs px-2 py-0.5 rounded font-bold">#{c.id}</span>
+                            <span className="text-[#8b7355] font-bold text-xs uppercase tracking-wider">Client Case File</span>
+                            <span className="bg-[#e5e0d5] text-[#5c4d3c] text-xs px-2 py-0.5 rounded font-bold">#{c.id}</span>
                         </div>
-                        <h3 className="text-xl font-serif font-bold">{c.case_title}</h3>
+                        <h3 className="text-xl font-serif font-bold text-[#1a1a1a]">{c.case_title}</h3>
                     </div>
                     <div className="text-right">
-                        <span className="bg-white/20 text-xs px-3 py-1.5 rounded-full font-medium">{c.case_type || "General Case"}</span>
-                        <p className="text-xs text-gray-300 mt-2">📅 Created: {new Date(c.created_at).toLocaleString()}</p>
+                        <span className="bg-[#f5f1e8] text-[#5c4d3c] px-3 py-1 rounded-full text-xs font-bold border border-[#e5e0d5]">{c.case_type || "General Case"}</span>
+                        <p className="text-xs text-[#999] mt-2">Created: {new Date(c.created_at).toLocaleDateString()}</p>
                     </div>
                 </div>
             </div>
 
             {/* Case File Body */}
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-6">
                 {/* Parties Section - 3 Column Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gradient-to-br from-[#f5e6c8]/70 to-[#f5e6c8]/30 p-4 rounded-lg border border-[#d4b896]">
-                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-1 flex items-center gap-1">
-                            <span>👤</span> Client Name
+                    <div className="bg-[#faf9f6] p-4 rounded-lg border border-[#f0ebe0]">
+                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-1">
+                            Client Name
                         </p>
-                        <p className="text-[#1a1a1a] font-semibold text-lg">{c.structured_data?.client_name || selectedClient?.client.name || "Not specified"}</p>
+                        <p className="text-[#1a1a1a] font-semibold">{c.structured_data?.client_name || selectedClient?.client.name || "Not specified"}</p>
                     </div>
-                    <div className="bg-gradient-to-br from-[#f5e6c8]/70 to-[#f5e6c8]/30 p-4 rounded-lg border border-[#d4b896]">
-                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-1 flex items-center gap-1">
-                            <span>⚔️</span> Opposing Party
+                    <div className="bg-[#faf9f6] p-4 rounded-lg border border-[#f0ebe0]">
+                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-1">
+                            Opposing Party
                         </p>
-                        <p className="text-[#1a1a1a] font-semibold text-lg">{c.structured_data?.opposing_party || "Not specified"}</p>
+                        <p className="text-[#1a1a1a] font-semibold">{c.structured_data?.opposing_party || "Not specified"}</p>
                     </div>
-                    <div className="bg-gradient-to-br from-[#f5e6c8]/70 to-[#f5e6c8]/30 p-4 rounded-lg border border-[#d4b896]">
-                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-1 flex items-center gap-1">
-                            <span>📅</span> Incident Date
+                    <div className="bg-[#faf9f6] p-4 rounded-lg border border-[#f0ebe0]">
+                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-1">
+                            Incident Date
                         </p>
-                        <p className="text-[#1a1a1a] font-semibold text-lg">{c.structured_data?.incident_date || "Unknown"}</p>
+                        <p className="text-[#1a1a1a] font-semibold">{c.structured_data?.incident_date || "Unknown"}</p>
                     </div>
                 </div>
 
                 {/* Legal Issue Summary */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-lg border border-blue-200 shadow-sm">
-                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <span className="text-base">📝</span> Legal Issue Summary
+                <div className="bg-white p-4 rounded-lg border border-[#e5e0d5]">
+                    <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <span>📝</span> Legal Issue Summary
                     </p>
-                    <p className="text-[#333] leading-relaxed text-base">{c.structured_data?.summary || c.description || "No summary available"}</p>
+                    <p className="text-[#4a4a4a] leading-relaxed text-sm">{c.structured_data?.summary || c.description || "No summary available"}</p>
                 </div>
 
                 {/* Two Column: Evidence & Legal Issues */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {/* Key Evidence List */}
-                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-5 rounded-lg border border-amber-200 shadow-sm">
-                        <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <span className="text-base">🔍</span> Key Evidence List
+                    <div className="bg-[#faf9f6] p-5 rounded-lg border border-[#f0ebe0]">
+                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <span>🔍</span> Key Evidence
                         </p>
                         {c.structured_data?.evidence && c.structured_data.evidence.length > 0 ? (
                             <ul className="space-y-2">
                                 {c.structured_data.evidence.map((item: string, i: number) => (
-                                    <li key={i} className="flex items-start gap-2 text-[#333]">
-                                        <span className="text-amber-600 font-bold">•</span>
+                                    <li key={i} className="flex items-start gap-2 text-[#4a4a4a] text-sm">
+                                        <span className="text-[#c0a080] font-bold mt-1">•</span>
                                         <span>{item}</span>
                                     </li>
                                 ))}
                             </ul>
                         ) : (
-                            <p className="text-gray-500 italic">No evidence documented yet</p>
+                            <p className="text-gray-400 text-sm italic">No evidence documented</p>
                         )}
                     </div>
 
                     {/* Legal Issues */}
-                    <div className="bg-gradient-to-r from-purple-50 to-violet-50 p-5 rounded-lg border border-purple-200 shadow-sm">
-                        <p className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <span className="text-base">📌</span> Key Legal Issues
+                    <div className="bg-[#faf9f6] p-5 rounded-lg border border-[#f0ebe0]">
+                        <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <span>📌</span> Included Legal Issues
                         </p>
                         {c.structured_data?.legal_issues && c.structured_data.legal_issues.length > 0 ? (
                             <ul className="space-y-2">
                                 {c.structured_data.legal_issues.map((issue: string, i: number) => (
-                                    <li key={i} className="flex items-start gap-2 text-[#333]">
-                                        <span className="text-purple-600 font-bold">•</span>
+                                    <li key={i} className="flex items-start gap-2 text-[#4a4a4a] text-sm">
+                                        <span className="text-[#c0a080] font-bold mt-1">•</span>
                                         <span>{issue}</span>
                                     </li>
                                 ))}
                             </ul>
                         ) : (
-                            <p className="text-gray-500 italic">No legal issues identified</p>
+                            <p className="text-gray-400 text-sm italic">No legal issues identified</p>
                         )}
                     </div>
                 </div>
 
                 {/* Applicable Laws Section */}
-                <div className="bg-gradient-to-r from-rose-50 to-pink-50 p-5 rounded-lg border border-rose-200 shadow-sm">
-                    <p className="text-xs font-bold text-rose-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <span className="text-base">⚖️</span> Applicable Laws & Statutes
+                <div className="bg-white p-4 rounded-lg border border-[#e5e0d5]">
+                    <p className="text-xs font-bold text-[#8b7355] uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span>⚖️</span> Applicable Laws & Statutes
                     </p>
                     {c.structured_data?.applicable_laws && c.structured_data.applicable_laws.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                            {c.structured_data.applicable_laws.map((law: string, i: number) => {
-                                const colors = [
-                                    "bg-rose-100 text-rose-800 border-rose-300",
-                                    "bg-blue-100 text-blue-800 border-blue-300",
-                                    "bg-indigo-100 text-indigo-800 border-indigo-300",
-                                    "bg-violet-100 text-violet-800 border-violet-300",
-                                    "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300"
-                                ];
-                                return (
-                                    <span key={i} className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${colors[i % colors.length]}`}>
-                                        {law}
-                                    </span>
-                                );
-                            })}
+                            {c.structured_data.applicable_laws.map((law: string, i: number) => (
+                                <span key={i} className="px-3 py-1 rounded bg-[#f5f1e8] text-[#5c4d3c] text-xs font-bold border border-[#e5e0d5]">
+                                    {law}
+                                </span>
+                            ))}
                         </div>
                     ) : (
-                        <p className="text-gray-500 italic">No applicable laws identified yet</p>
+                        <p className="text-gray-400 text-sm italic">No applicable laws identified</p>
                     )}
                 </div>
 
-                {/* Citations Section (from web scraping) */}
+                {/* Citations Section */}
                 {c.citations && c.citations.length > 0 && (
-                    <div className="bg-gradient-to-r from-cyan-50 to-teal-50 p-5 rounded-lg border border-cyan-200 shadow-sm">
-                        <p className="text-xs font-bold text-cyan-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <span className="text-base">📚</span> Case Citations (via Web Research)
+                    <div className="bg-[#f0f9ff] p-5 rounded-lg border border-blue-100">
+                        <p className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <span>📚</span> Case Citations
                         </p>
                         <div className="space-y-3">
                             {c.citations.map((cite: any, i: number) => (
-                                <div key={i} className="bg-white p-3 rounded-lg border border-cyan-100 shadow-sm">
+                                <div key={i} className="bg-white p-3 rounded border border-blue-50 shadow-sm">
                                     <div className="flex justify-between items-start mb-1">
                                         <p className="font-semibold text-[#1a1a1a] text-sm">{cite.case_title || cite.title || `Citation ${i + 1}`}</p>
-                                        <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded">{cite.court || cite.case_type || "Legal"}</span>
+                                        <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">{cite.court || cite.case_type || "Legal"}</span>
                                     </div>
                                     {cite.ai_summary && <p className="text-xs text-gray-600 mt-1">{cite.ai_summary}</p>}
-                                    {cite.verdict && <p className="text-xs text-emerald-600 mt-1">Verdict: {cite.verdict}</p>}
-                                    {cite.url && (
-                                        <a href={cite.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline mt-1 inline-block">
-                                            🔗 View Full Case
-                                        </a>
-                                    )}
+                                    {cite.verdict && <p className="text-xs text-green-700 mt-1 font-medium">Verdict: {cite.verdict}</p>}
                                 </div>
                             ))}
                         </div>
@@ -337,28 +323,28 @@ export default function ClientsPage() {
                 )}
 
                 {/* Recommended Actions */}
-                <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-5 rounded-lg border border-emerald-200 shadow-sm">
-                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <span className="text-base">✅</span> Recommended Actions
+                <div className="bg-[#f0fdf4] p-5 rounded-lg border border-green-100">
+                    <p className="text-xs font-bold text-green-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <span>✅</span> Recommended Actions
                     </p>
-                    <p className="text-[#333] leading-relaxed text-base">{c.structured_data?.recommended_action || "No recommendations available yet"}</p>
+                    <p className="text-[#333] leading-relaxed text-sm">{c.structured_data?.recommended_action || "No recommendations available yet"}</p>
                 </div>
 
                 {/* Raw Notes (Collapsible) */}
-                <details className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-                    <summary className="p-4 cursor-pointer text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-2">
-                        <span>📄</span> View Original Raw Notes
+                <details className="bg-gray-50 rounded border border-gray-200">
+                    <summary className="p-3 cursor-pointer text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors">
+                        View Original Raw Notes
                     </summary>
-                    <div className="p-4 pt-0 border-t border-gray-200 bg-white">
-                        <pre className="text-sm text-gray-600 whitespace-pre-wrap font-sans">{c.description}</pre>
+                    <div className="p-3 pt-0 border-t border-gray-200 bg-white">
+                        <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono mt-2">{c.description}</pre>
                     </div>
                 </details>
             </div>
 
-            {/* Case File Footer */}
-            <div className="bg-[#f5f1e8] px-6 py-3 border-t border-[#d4b896] flex justify-between items-center">
-                <span className="text-xs text-[#8b7355] font-medium">🤖 AI-Analyzed Case File</span>
-                <span className="text-xs text-[#8b7355]">Case #{c.id} • {c.case_type}</span>
+            {/* Footer */}
+            <div className="bg-[#fcfaf7] px-6 py-3 border-t border-[#e5e0d5] flex justify-between items-center">
+                <span className="text-xs text-[#8b7355] font-medium flex items-center gap-1">✨ AI Analysis Complete</span>
+                <span className="text-xs text-[#999]">Confidential Case File</span>
             </div>
         </div>
     );
@@ -391,53 +377,35 @@ export default function ClientsPage() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {clients.map((client, idx) => {
-                                // Multi-colored theme palette
-                                const colorSchemes = [
-                                    { bg: 'from-[#fef3e2] to-[#fde8d0]', accent: '#f97316', avatarBg: 'bg-orange-100', avatarText: 'text-orange-700' },
-                                    { bg: 'from-[#e8f5e9] to-[#c8e6c9]', accent: '#22c55e', avatarBg: 'bg-green-100', avatarText: 'text-green-700' },
-                                    { bg: 'from-[#e3f2fd] to-[#bbdefb]', accent: '#3b82f6', avatarBg: 'bg-blue-100', avatarText: 'text-blue-700' },
-                                    { bg: 'from-[#fce4ec] to-[#f8bbd9]', accent: '#ec4899', avatarBg: 'bg-pink-100', avatarText: 'text-pink-700' },
-                                    { bg: 'from-[#f3e5f5] to-[#e1bee7]', accent: '#a855f7', avatarBg: 'bg-purple-100', avatarText: 'text-purple-700' },
-                                    { bg: 'from-[#fff8e1] to-[#ffecb3]', accent: '#eab308', avatarBg: 'bg-yellow-100', avatarText: 'text-yellow-700' },
-                                ];
-                                const scheme = colorSchemes[idx % colorSchemes.length];
-
-                                return (
-                                    <motion.div
-                                        key={client.id}
-                                        whileHover={{ scale: 1.02, y: -4 }}
-                                        onClick={() => handleClientClick(client.id)}
-                                        className={`bg-gradient-to-br ${scheme.bg} backdrop-blur-sm border-2 border-[#d4b896]/50 rounded-2xl p-6 cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden`}
-                                    >
-                                        {/* Decorative accent stripe */}
-                                        <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ backgroundColor: scheme.accent }} />
-
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div className={`w-14 h-14 ${scheme.avatarBg} rounded-xl flex items-center justify-center text-2xl font-serif font-bold ${scheme.avatarText} shadow-sm`}>
-                                                {client.name.charAt(0)}
-                                            </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm ${client.status === 'Active'
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-gray-500 text-white'
-                                                }`}>
-                                                {client.status}
-                                            </span>
+                            {clients.map((client) => (
+                                <motion.div
+                                    key={client.id}
+                                    whileHover={{ scale: 1.02, y: -4 }}
+                                    onClick={() => handleClientClick(client.id)}
+                                    className="bg-white border text-left border-[#e5e0d5] rounded-xl p-6 cursor-pointer shadow-sm hover:shadow-md transition-all duration-300 group relative overflow-hidden"
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="w-12 h-12 bg-[#f5f1e8] rounded-full flex items-center justify-center text-xl font-serif font-bold text-[#1a1a1a]">
+                                            {client.name.charAt(0)}
                                         </div>
-                                        <h3 className="text-xl font-serif font-bold text-[#1a1a1a] mb-1 group-hover:text-[#f97316] transition-colors">{client.name}</h3>
-                                        <p className="text-sm text-[#666] mb-4">{client.email || "Case #" + client.id}</p>
-                                        <div className="pt-4 border-t border-[#d4b896]/40 flex justify-between items-center">
-                                            <span className="text-xs font-semibold text-[#8b7355] flex items-center gap-1">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                </svg>
-                                                View Case File
-                                            </span>
-                                            <span className="text-lg group-hover:translate-x-1 transition-transform" style={{ color: scheme.accent }}>→</span>
-                                        </div>
-                                    </motion.div>
-                                );
-                            })}
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${client.status === 'Active'
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                                            }`}>
+                                            {client.status}
+                                        </span>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-[#1a1a1a] mb-1 group-hover:text-[#c0a080] transition-colors">{client.name}</h3>
+                                    <p className="text-sm text-[#666] mb-4">{client.email || "Case #" + client.id}</p>
+
+                                    <div className="pt-4 border-t border-[#f0ebe0] flex justify-between items-center text-sm">
+                                        <span className="text-[#8b7355] font-medium flex items-center gap-2">
+                                            View Profile
+                                        </span>
+                                        <span className="text-[#d4b896] group-hover:translate-x-1 transition-transform">→</span>
+                                    </div>
+                                </motion.div>
+                            ))}
                         </div>
                     </motion.div>
                 ) : (
