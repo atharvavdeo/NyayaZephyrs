@@ -179,6 +179,26 @@ Every critical action is logged to the tenant's `audit_logs` table (or master `a
 
 The platform uses a specialized retrieval pipeline optimized for legal texts.
 
+```mermaid
+graph LR
+    subgraph "Ingestion Pipeline"
+        PDF[PDF Document] -->|PyPDF2| Text[Raw Text]
+        Text -->|Clean & Normalize| DocDB[(Tenant DB: Documents)]
+    end
+
+    subgraph "Retrieval & Generation"
+        User[User Query] -->|1. Sanitize| Guard[Guardrails]
+        Guard -->|2. Fetch Context| ContextEngine[Context Engine]
+        
+        ContextEngine <-->|Query| DocDB
+        ContextEngine <-->|Fetch History| ChatLog[(Your Chat Logs)]
+        
+        ContextEngine -->|3. Assemble Prompt| LLM[Groq LPU]
+        LLM -->|4. Generate Response| Validator[Hallucination Checker]
+        Validator -->|5. Verified Answer| Final[Final Response]
+    end
+```
+
 ### 1. Ingestion Pipeline
 1.  **PDF Upload**: `PyPDF2` extracts raw text from uploaded legal documents.
 2.  **Text Cleaning**: Normalization of whitespace, removal of headers/footers.
