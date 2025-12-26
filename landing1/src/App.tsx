@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import ClientsPage from "./ClientsPage";
 import LegalResearcherPage from "./LegalResearcherPage";
+import AdminDashboard from "./AdminDashboard";
 import { LanguageProvider, useLanguage } from "./LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { getUserCases, type CaseDetails } from "./api/legalResearcher";
@@ -1112,7 +1113,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 }
 
 // Dashboard Page Component
-function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
+function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher" | "admin") => void }) {
   const { t } = useLanguage();
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
   const [dashboardStats, setDashboardStats] = useState({
@@ -1321,7 +1322,16 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
+              className="flex items-center gap-3"
             >
+              <button
+                onClick={() => onNavigate("admin")}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-white rounded-lg hover:bg-[#333] transition-all shadow-md text-sm font-medium"
+                title="Admin Dashboard"
+              >
+                <span>🛡️</span>
+                <span className="hidden sm:inline">Admin</span>
+              </button>
               <LanguageSelector variant="dropdown" />
             </motion.div>
           </div>
@@ -2286,7 +2296,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docume
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "settings" | "clients" | "legal-researcher">("dashboard");
+  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "settings" | "clients" | "legal-researcher" | "admin">("dashboard");
 
   // Landing page doesn't need LanguageProvider
   if (currentPage === "landing") {
@@ -2330,6 +2340,13 @@ export default function App() {
           <div className="flex-1 relative z-10 pt-20">
             <LegalResearcherPage />
           </div>
+        </div>
+      )}
+
+      {currentPage === "admin" && (
+        <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
+          <TopNavbar activePage="dashboard" onNavigate={(page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => setCurrentPage(page)} />
+          <AdminDashboard />
         </div>
       )}
     </LanguageProvider>
