@@ -6,13 +6,15 @@
 
 ## 📖 Table of Contents
 1. [Executive Summary](#-executive-summary)
-2. [Master Architecture](#-master-architecture)
-3. [Multi-Tenant Database System](#-multi-tenant-database-system)
-4. [Security & Compliance](#-security--compliance)
-5. [AI & RAG Architecture](#-ai--rag-architecture)
-6. [API Reference](#-api-reference)
-7. [Frontend Dashboard](#-frontend-dashboard)
-8. [Installation & Setup](#-installation--setup)
+2. [Tech Stack](#-tech-stack)
+3. [Master Architecture](#-master-architecture)
+4. [Multi-Tenant Database System](#-multi-tenant-database-system)
+5. [Security & Compliance](#-security--compliance)
+6. [RAG & Extraction Architecture](#-rag--extraction-architecture)
+7. [Legal Researcher Architecture](#-legal-researcher-architecture)
+8. [API Reference](#-api-reference)
+9. [Frontend Dashboard](#-frontend-dashboard)
+10. [Installation & Setup](#-installation--setup)
 
 ---
 
@@ -21,6 +23,36 @@
 **ZeroDay** is a production-grade AI platform designed for legal professionals to manage cases, perform automated legal research, and interact with case documents using secure, context-aware AI. 
 
 Unlike standard LegalWrappers, ZeroDay implements a **defense-in-depth security architecture** featuring strict multi-tenancy, immutable audit logging, and AI guardrails to prevent hallucinations and prompt injection attacks.
+
+---
+
+## 💻 Tech Stack
+
+### Frontend (Client-Side)
+*   **Framework**: React 18 (Vite)
+*   **Language**: TypeScript
+*   **Styling**: Tailwind CSS, PostCSS
+*   **Animation**: Framer Motion
+*   **State Management**: React Hooks (Context API)
+*   **Routing**: React Router DOM
+
+### Backend (Server-Side)
+*   **Framework**: FastAPI (Python 3.10+)
+*   **Server**: Uvicorn (ASGI)
+*   **Authentication**: PyJWT (Stateless), BCrypt (Hashing)
+*   **Database**: SQLite (Multi-Tenant Strategy)
+*   **Validation**: Pydantic v2
+
+### AI & Data Engineering
+*   **LLM Inference**: Groq LPU (Llama-3-70b-Versatile)
+*   **Web Search**: Firecrawl SDK (Custom Legal Scraper)
+*   **PDF Processing**: PyPDF2, pdfplumber
+*   **Guards**: Custom Regex Guardrails, Output Validators
+
+### DevOps & Tools
+*   **Version Control**: Git
+*   **Package Management**: pip, npm
+*   **Environment**: dotenv
 
 ---
 
@@ -48,7 +80,7 @@ graph TD
     subgraph "AI Processing Layer"
         API -->|Context| Chat[Secure Chatbot]
         API -->|Extraction| Gen[Case Generator]
-        Chat <-->|Inference| Groq[Groq LPU (Llama 3)]
+        Chat <-->|Inference| Groq["Groq LPU (Llama 3)"]
         Gen <-->|Research| Firecrawl[Firecrawl Search]
     end
 ```
@@ -143,25 +175,51 @@ Every critical action is logged to the tenant's `audit_logs` table (or master `a
 
 ---
 
-## 🤖 AI & RAG Architecture
+## 🧠 RAG & Extraction Architecture
 
-The platform uses a specialized RAG (Retrieval-Augmented Generation) pipeline optimized for legal texts.
+The platform uses a specialized retrieval pipeline optimized for legal texts.
 
 ### 1. Ingestion Pipeline
-1.  **PDF Upload**: `PyPDF2` extracts text from legal documents.
-2.  **Text Cleaning**: Normalization of whitespace and legal artifacts.
-3.  **Storage**: Raw text is stored in `documents` table (Tenant DB).
+1.  **PDF Upload**: `PyPDF2` extracts raw text from uploaded legal documents.
+2.  **Text Cleaning**: Normalization of whitespace, removal of headers/footers.
+3.  **Storage**: Cleaned text is stored in `documents` table (Tenant DB).
 
 ### 2. AI Extraction Engine (`CaseGenerator`)
-*   **Problem**: Unstructured client notes/PDFs.
-*   **Solution**: Single-shot prompting with `Llama-3-70b` to extract secure JSON structure.
-*   **Fields**: `client_name`, `opposing_party`, `legal_issues`, `key_evidence`.
+*   **Input**: Unstructured client notes or PDF text.
+*   **Model**: Llama-3-70b via Groq (0.1 Temperature).
+*   **Prompting**: Single-shot prompting asking for rigid JSON output.
+*   **Output**: Structured JSON containing:
+    *   `client_name`
+    *   `opposing_party`
+    *   `legal_issues` (Array)
+    *   `key_evidence` (Array)
+    *   `recommended_actions`
 
 ### 3. Context-Aware Chat (`SecureChatbot`)
-1.  **Context Retrieval**: Fetches Case Metadata + Case Documents + Chat History (Last 5 messages).
-2.  **Prompt Engineering**: Uses rigid system prompts to enforce "Legal Assistant" persona.
-3.  **Inference**: User Query + Context sent to Groq LPU (Low Latency Processing Unit).
-4.  **Verification**: Response is cross-checked against case facts before returning to user.
+1.  **Context Assembly**:
+    *   Fetches structured case metadata.
+    *   Fetches full text of attached documents.
+    *   Fetches last 5 chat messages (Conversation History).
+2.  **System Prompt**: Injects a strict "Legal Assistant" persona with safety instructions.
+3.  **Inference**: Sends `User Query + Context` to Groq LPU.
+4.  **Verification**: Responses are cross-checked against case facts to warn about potential hallucinations.
+
+---
+
+## 🔍 Legal Researcher Architecture
+
+A dedicated module for autonomous web-based legal research using **Firecrawl**.
+
+### Workflow
+1.  **Query Generation**: LLM analyzes basic case facts to generate 3-5 specific search queries (e.g., "Supreme Court Property dispute brother sister").
+2.  **Web Scraping (Firecrawl)**:
+    *   Searches trusted legal repositories (e.g., Indian Kanoon).
+    *   Respects `robots.txt` and implements rate limiting (6s delay).
+    *   Extracts page content as markdown.
+3.  **Re-Ranking & Filtering**:
+    *   LLM reviews scraped content to filter out irrelevant cases.
+    *   Extracts `Verdict`, `Court`, `Year`, and generates a 2-sentence summary.
+4.  **Storage**: Results are stored in a structured JSON database (per client) for later retrieval.
 
 ---
 
@@ -196,8 +254,8 @@ Base URL: `/legal`
 
 The frontend (`landing1`) is a modern React application built with:
 *   **Vite + TypeScript**: For performance and type safety.
-*   **Framer Motion**: Smooth transitions and sleek UI.
 *   **Admin Dashboard**: A dedicated security view (`/admin`) displaying audit trails, vulnerability status, and system health.
+*   **UI Components**: Custom components inspired by modern financial/legal dashboards (Standardized Beige/White theme).
 
 ---
 
