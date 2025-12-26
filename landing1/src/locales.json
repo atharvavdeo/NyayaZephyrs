@@ -62,7 +62,9 @@
         "phone": "Phone",
         "status": "Status",
         "created": "Created",
-        "actions": "Actions"
+        "actions": "Actions",
+        "completed_cases": "Completed Cases",
+        "document_library": "Document Library"
     },
     "es": {
         "dashboard": "Panel de Control",
@@ -127,7 +129,9 @@
         "phone": "Teléfono",
         "status": "Estado",
         "created": "Creado",
-        "actions": "Acciones"
+        "actions": "Acciones",
+        "completed_cases": "Casos Completados",
+        "document_library": "Biblioteca de Documentos"
     },
     "hi": {
         "dashboard": "डैशबोर्ड",
@@ -192,7 +196,9 @@
         "phone": "फोन",
         "status": "स्थिति",
         "created": "बनाया गया",
-        "actions": "कार्रवाई"
+        "actions": "कार्रवाई",
+        "completed_cases": "पूर्ण केस",
+        "document_library": "दस्तावेज़ पुस्तकालय"
     },
     "fr": {
         "dashboard": "Tableau de Bord",
@@ -257,7 +263,9 @@
         "phone": "Téléphone",
         "status": "Statut",
         "created": "Créé",
-        "actions": "Actions"
+        "actions": "Actions",
+        "completed_cases": "Dossiers Terminés",
+        "document_library": "Bibliothèque de Documents"
     },
     "de": {
         "dashboard": "Dashboard",
@@ -322,7 +330,9 @@
         "phone": "Telefon",
         "status": "Status",
         "created": "Erstellt",
-        "actions": "Aktionen"
+        "actions": "Aktionen",
+        "completed_cases": "Abgeschlossene Fälle",
+        "document_library": "Dokumentenbibliothek"
     },
     "zh-CN": {
         "dashboard": "仪表板",
@@ -387,6 +397,8 @@
         "phone": "电话",
         "status": "状态",
         "created": "创建时间",
-        "actions": "操作"
+        "actions": "操作",
+        "completed_cases": "已完成案件",
+        "document_library": "文档库"
     }
 }

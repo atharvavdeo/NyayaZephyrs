@@ -7,7 +7,7 @@ interface LanguageSelectorProps {
 }
 
 export function LanguageSelector({ variant = 'dropdown', className = '' }: LanguageSelectorProps) {
-    const { language, setLanguage, availableLanguages, t } = useLanguage();
+    const { language, setLanguage, availableLanguages } = useLanguage();
 
     if (variant === 'buttons') {
         return (
@@ -28,30 +28,29 @@ export function LanguageSelector({ variant = 'dropdown', className = '' }: Langu
         );
     }
 
-    // Dropdown variant (default)
+    // Dropdown variant (default) - with high visibility styling
     return (
         <div className={`relative ${className}`}>
-            <label className="block text-xs text-white/50 mb-1">
-                {t('language')}
-            </label>
             <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as LanguageCode)}
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm appearance-none cursor-pointer hover:bg-white/15 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="px-4 py-2 bg-[#1a1a1a] border-2 border-[#444] rounded-lg text-white text-sm font-medium appearance-none cursor-pointer hover:bg-[#333] hover:border-[#666] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#f97316] shadow-lg"
                 style={{
                     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                     backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 8px center',
-                    backgroundSize: '16px'
+                    backgroundPosition: 'right 10px center',
+                    backgroundSize: '16px',
+                    paddingRight: '36px',
+                    minWidth: '140px'
                 }}
             >
                 {availableLanguages.map((lang) => (
                     <option
                         key={lang.code}
                         value={lang.code}
-                        className="bg-gray-800 text-white"
+                        className="bg-[#1a1a1a] text-white"
                     >
-                        {lang.name}
+                        🌐 {lang.name}
                     </option>
                 ))}
             </select>

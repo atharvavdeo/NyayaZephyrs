@@ -1121,6 +1121,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 
 // Dashboard Page Component
 function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
+  const { t } = useLanguage();
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
   const [dashboardStats, setDashboardStats] = useState({
     documents_analyzed: 0,
@@ -1300,7 +1301,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
                 className="text-[28px] sm:text-[36px] md:text-[48px] font-normal mb-2 tracking-[-0.02em] leading-[1.15]"
                 style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}
               >
-                <span className="text-[#1a1a1a]">Legal Dashboard</span>
+                <span className="text-[#1a1a1a]">{t('dashboard')}</span>
               </motion.h1>
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
@@ -1415,7 +1416,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <svg className="w-5 h-5 text-[#6b5744]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>Ongoing Cases</h3>
+              <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>{t('ongoing_cases')}</h3>
             </div>
             <div className="space-y-3">
               {ongoingCasesData.map((caseItem: any) => (
@@ -1453,7 +1454,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <svg className="w-5 h-5 text-[#6b5744]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>Completed Cases (Latest 5)</h3>
+              <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>{t('completed_cases')}</h3>
             </div>
             <div className="space-y-2">
               {completedCasesData.map((caseItem: any) => (
@@ -1484,7 +1485,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <svg className="w-5 h-5 text-[#6b5744]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
-              <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>Document Library (Click to view all)</h3>
+              <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>{t('document_library')}</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {documentLibraryData.slice(0, 3).map((doc: any, idx: number) => (
