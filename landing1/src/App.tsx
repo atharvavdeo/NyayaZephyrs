@@ -7,6 +7,7 @@ import ClientsPage from "./ClientsPage";
 import LegalResearcherPage from "./LegalResearcherPage";
 import { LanguageProvider, useLanguage } from "./LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
+import { getUserCases, type CaseDetails } from "./api/legalResearcher";
 
 interface Block {
   id: number;
@@ -1137,6 +1138,8 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     time_saved_minutes: 0
   });
   const [_statsLoading, setStatsLoading] = useState(true);
+  const [cases, setCases] = useState<CaseDetails[]>([]);
+  const [_casesLoading, setCasesLoading] = useState(true);
 
   // Fetch real stats from backend
   useEffect(() => {
@@ -1156,6 +1159,23 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     fetchStats();
   }, []);
 
+  // Fetch real cases from backend
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const res = await getUserCases(1); // Default user_id = 1
+        if (res.success && res.cases) {
+          setCases(res.cases);
+        }
+      } catch (error) {
+        console.error("Failed to fetch cases:", error);
+      } finally {
+        setCasesLoading(false);
+      }
+    };
+    fetchCases();
+  }, []);
+
   // Use fetched stats with fallback
   const timeSaved = { hours: dashboardStats.time_saved_hours, period: "total" };
   const stats = {
@@ -1164,9 +1184,28 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     accuracy: 94.2
   };
   const calendarEventsData = calendarEvents;
-  const ongoingCasesData = ongoingCases;
-  const completedCasesData = completedCases;
-  const documentLibraryData = documentLibrary;
+
+  // Filter cases by completion status
+  const ongoingCasesData = cases.filter(c => !c.is_complete).slice(0, 5).map(c => ({
+    id: c.case_id.toString(),
+    parties: c.client_name + (c.opposing_party ? ` vs ${c.opposing_party}` : ''),
+    progress: c.progress,
+    stage: c.stage || 'Pending'
+  }));
+
+  const completedCasesData = cases.filter(c => c.is_complete).slice(0, 5).map(c => ({
+    id: c.case_id.toString(),
+    parties: c.client_name + (c.opposing_party ? ` vs ${c.opposing_party}` : ''),
+    verdict: 'COMPLETED',
+    details: c.stage,
+    date: new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }));
+
+  const documentLibraryData = cases.slice(0, 3).map(c => ({
+    id: c.case_id,
+    name: c.client_name + (c.opposing_party ? ` vs ${c.opposing_party}` : ''),
+    date: new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }));
 
   const getVerdictEmoji = (verdict: string) => {
     switch (verdict) {
