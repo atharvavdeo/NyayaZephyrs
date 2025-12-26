@@ -1,342 +1,383 @@
 """
-Database Manager v2.0 - Security Enhanced
-==========================================
-- User authentication with bcrypt hashing
-- User-scoped case access
-- PDF document storage
-- Chat history linked to cases
+Multi-Tenant Database Router
+============================
+Implements secure database isolation per lawyer:
+
+- Master DB (master_auth.db): Contains ONLY users table for authentication
+- Tenant DBs (lawyer_{user_id}.db): Each lawyer gets their own isolated database
+
+This architecture ensures:
+1. Complete data isolation between lawyers
+2. No accidental data leaks via SQL query mistakes
+3. Easy per-lawyer backup and migration
+4. GDPR-compliant data deletion (delete entire file)
 """
 
 import sqlite3
-import json
-import bcrypt
+import os
 import logging
+import bcrypt
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
-DB_NAME = "legal_system.db"
+# Configuration
+BASE_DB_FOLDER = os.path.join(os.path.dirname(__file__), "databases")
+MASTER_DB_NAME = "master_auth.db"
+
+logger = logging.getLogger(__name__)
 
 
-class DatabaseManager:
+class DatabaseRouter:
+    """
+    Routes database connections to the appropriate database file.
+    
+    - Authentication queries → Master DB
+    - All other queries → Tenant DB (per-lawyer)
+    """
+    
     def __init__(self):
-        self.create_tables()
-
-    def connect(self):
-        conn = sqlite3.connect(DB_NAME, check_same_thread=False)
-        conn.row_factory = sqlite3.Row  # Return dict-like rows
+        # Ensure the databases folder exists
+        if not os.path.exists(BASE_DB_FOLDER):
+            os.makedirs(BASE_DB_FOLDER)
+            logger.info(f"Created databases folder: {BASE_DB_FOLDER}")
+        
+        # Initialize the Master DB (Auth only)
+        self._init_master_db()
+    
+    # ==================== CONNECTION HANDLERS ====================
+    
+    def get_master_conn(self) -> sqlite3.Connection:
+        """
+        Connect to the Master Database for authentication operations.
+        Contains: users table ONLY
+        """
+        db_path = os.path.join(BASE_DB_FOLDER, MASTER_DB_NAME)
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
         return conn
-
-    def create_tables(self):
-        with self.connect() as conn:
+    
+    def get_tenant_conn(self, user_id: int) -> sqlite3.Connection:
+        """
+        Connect to a specific Lawyer's private database.
+        Auto-creates the database with schema if it doesn't exist.
+        
+        SECURITY: Each lawyer's data is completely isolated in their own file.
+        """
+        if not user_id:
+            raise ValueError("User ID required to access tenant database - security violation!")
+        
+        db_filename = f"lawyer_{user_id}.db"
+        db_path = os.path.join(BASE_DB_FOLDER, db_filename)
+        
+        is_new = not os.path.exists(db_path)
+        
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        
+        if is_new:
+            logger.info(f"Creating new tenant database for user {user_id}")
+            self._init_tenant_tables(conn)
+        
+        return conn
+    
+    # ==================== MASTER DB SCHEMA ====================
+    
+    def _init_master_db(self):
+        """Create the Users table in Master DB - contains NO case data."""
+        with self.get_master_conn() as conn:
             cursor = conn.cursor()
             
-            # Table 1: Users (Authentication)
+            # Users table - authentication only
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Table 2: Cases (Linked to User for data isolation)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS cases (
-                    case_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    client_name TEXT,
-                    raw_description TEXT,
-                    structured_data TEXT,
-                    progress INTEGER DEFAULT 0,
-                    stage TEXT DEFAULT '',
+                    email TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(user_id) REFERENCES users(user_id)
+                    last_login TIMESTAMP
                 )
             """)
             
-            # Table 3: Documents (PDF content storage)
+            # Audit log for authentication events (master-level)
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS documents (
-                    doc_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    case_id INTEGER NOT NULL,
-                    filename TEXT,
-                    parsed_text TEXT,
-                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(case_id) REFERENCES cases(case_id)
-                )
-            """)
-            
-            # Table 4: Chat Logs (Linked to Cases)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS chat_logs (
-                    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    case_id INTEGER NOT NULL,
-                    role TEXT,
-                    content TEXT,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(case_id) REFERENCES cases(case_id)
-                )
-            """)
-            
-            # Table 5: Audit Logs (Security & Compliance)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS audit_logs (
+                CREATE TABLE IF NOT EXISTS auth_audit_logs (
                     log_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     user_id INTEGER,
                     action TEXT NOT NULL,
-                    resource_type TEXT,
-                    resource_id INTEGER,
                     ip_address TEXT,
                     user_agent TEXT,
-                    details TEXT,
                     status TEXT DEFAULT 'success',
-                    FOREIGN KEY(user_id) REFERENCES users(user_id)
+                    details TEXT
                 )
             """)
             conn.commit()
-            
-            # Migration: Add progress and stage columns if they don't exist
-            try:
-                cursor.execute("ALTER TABLE cases ADD COLUMN progress INTEGER DEFAULT 0")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-            try:
-                cursor.execute("ALTER TABLE cases ADD COLUMN stage TEXT DEFAULT ''")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-            conn.commit()
-
-    # ==================== AUTH METHODS ====================
     
-    def register_user(self, username: str, password: str) -> bool:
+    # ==================== TENANT DB SCHEMA ====================
+    
+    def _init_tenant_tables(self, conn: sqlite3.Connection):
         """
-        Register a new user with bcrypt password hashing.
-        Returns True on success, False if username exists.
+        Create all tables for a NEW lawyer's private database.
+        
+        NOTE: No user_id column needed in these tables because
+        the entire FILE belongs to one user - complete isolation!
+        """
+        cursor = conn.cursor()
+        
+        # Cases table (no user_id - whole DB is user-scoped)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cases (
+                case_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_name TEXT,
+                raw_description TEXT,
+                structured_data TEXT,
+                progress INTEGER DEFAULT 0,
+                stage TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Documents table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS documents (
+                doc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id INTEGER NOT NULL,
+                filename TEXT,
+                parsed_text TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(case_id) REFERENCES cases(case_id)
+            )
+        """)
+        
+        # Chat logs table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chat_logs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id INTEGER NOT NULL,
+                role TEXT,
+                content TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(case_id) REFERENCES cases(case_id)
+            )
+        """)
+        
+        # Tenant-level audit logs
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                action TEXT NOT NULL,
+                resource_type TEXT,
+                resource_id INTEGER,
+                ip_address TEXT,
+                user_agent TEXT,
+                details TEXT,
+                status TEXT DEFAULT 'success'
+            )
+        """)
+        
+        conn.commit()
+        logger.info("Initialized tenant database schema")
+    
+    # ==================== AUTHENTICATION METHODS (Master DB) ====================
+    
+    def register_user(self, username: str, password: str, email: str = None) -> Optional[int]:
+        """
+        Register a new user in the Master DB.
+        Returns user_id on success, None if username exists.
         """
         password_bytes = password.encode('utf-8')
-        salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password_bytes, salt)
+        hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode('utf-8')
         
         try:
-            with self.connect() as conn:
-                conn.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                    (username, hashed)
+            with self.get_master_conn() as conn:
+                cursor = conn.execute(
+                    "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                    (username, hashed, email)
                 )
-                return True
+                user_id = cursor.lastrowid
+                
+                # Auto-create their tenant database
+                tenant_conn = self.get_tenant_conn(user_id)
+                tenant_conn.close()
+                
+                return user_id
         except sqlite3.IntegrityError:
-            return False  # Username already exists
-
-    def login_user(self, username: str, password: str) -> Optional[int]:
+            return None  # Username already exists
+    
+    def login_user(self, username: str, password: str) -> Optional[Dict]:
         """
-        Verify credentials and return user_id if valid.
-        Returns None if invalid.
+        Verify credentials against Master DB.
+        Returns user dict with user_id and username, or None if invalid.
         """
-        with self.connect() as conn:
+        with self.get_master_conn() as conn:
             cursor = conn.execute(
-                "SELECT user_id, password_hash FROM users WHERE username = ?",
+                "SELECT user_id, username, password_hash FROM users WHERE username = ?",
                 (username,)
             )
             user = cursor.fetchone()
             
-            if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash']):
-                return user['user_id']
+            if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+                # Update last login
+                conn.execute(
+                    "UPDATE users SET last_login = ? WHERE user_id = ?",
+                    (datetime.now(), user['user_id'])
+                )
+                return {"user_id": user['user_id'], "username": user['username']}
         return None
-
+    
     def get_username(self, user_id: int) -> str:
-        """Get username by user_id."""
-        with self.connect() as conn:
+        """Get username by user_id from Master DB."""
+        with self.get_master_conn() as conn:
             cursor = conn.execute(
                 "SELECT username FROM users WHERE user_id = ?",
                 (user_id,)
             )
             user = cursor.fetchone()
             return user['username'] if user else "Unknown"
-
-    # ==================== CASE METHODS (User-Scoped) ====================
     
-    def save_case(self, user_id: int, client_name: str, structured_data: dict, raw_desc: str = "") -> int:
-        """
-        Save a new case for a specific user.
-        Returns the new case_id.
-        """
-        with self.connect() as conn:
+    def log_auth_event(self, action: str, user_id: int = None, ip_address: str = None, 
+                       user_agent: str = None, status: str = "success", details: str = None):
+        """Log authentication events to Master DB audit log."""
+        with self.get_master_conn() as conn:
+            conn.execute("""
+                INSERT INTO auth_audit_logs (user_id, action, ip_address, user_agent, status, details)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, action, ip_address, user_agent, status, details))
+    
+    # ==================== CASE METHODS (Tenant DB) ====================
+    
+    def create_case(self, user_id: int, client_name: str, raw_description: str = None, 
+                    structured_data: str = "{}") -> int:
+        """Create a new case in the user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
             cursor = conn.execute(
-                "INSERT INTO cases (user_id, client_name, raw_description, structured_data) VALUES (?, ?, ?, ?)",
-                (user_id, client_name, raw_desc, json.dumps(structured_data))
+                "INSERT INTO cases (client_name, raw_description, structured_data) VALUES (?, ?, ?)",
+                (client_name, raw_description, structured_data)
             )
             return cursor.lastrowid
-
-    def get_user_cases(self, user_id: int) -> List:
-        """
-        Get all cases belonging to a specific user.
-        CRITICAL: Ensures data isolation between users.
-        """
-        with self.connect() as conn:
-            return conn.execute(
-                "SELECT * FROM cases WHERE user_id = ? ORDER BY created_at DESC",
-                (user_id,)
-            ).fetchall()
-
-    def get_case(self, case_id: int, user_id: int = None):
-        """
-        Get a specific case by ID with mandatory user ownership check.
-        
-        SECURITY: Always includes user_id in query to enforce data siloing.
-        Even if user_id is None, we require it to prevent unauthorized access.
-        """
-        with self.connect() as conn:
-            if user_id is not None:
-                # Normal case: verify ownership
-                cursor = conn.execute(
-                    "SELECT * FROM cases WHERE case_id = ? AND user_id = ?",
-                    (case_id, user_id)
-                )
-            else:
-                # INTERNAL USE ONLY: For system operations like hallucination checking
-                # Should be avoided in API endpoints - log this usage
-                logging.warning(f"get_case called without user_id for case_id={case_id} - potential security issue")
-                cursor = conn.execute(
-                    "SELECT * FROM cases WHERE case_id = ?",
-                    (case_id,)
-                )
-            return cursor.fetchone()
-
-    def delete_case(self, case_id: int, user_id: int) -> bool:
-        """Delete a case (only if owned by user)."""
-        with self.connect() as conn:
-            cursor = conn.execute(
-                "DELETE FROM cases WHERE case_id = ? AND user_id = ?",
-                (case_id, user_id)
-            )
-            return cursor.rowcount > 0
-
-    def update_case_progress(self, case_id: int, user_id: int, progress: int, stage: str) -> bool:
-        """
-        Update progress and stage for a case.
-        Progress: 0-100 integer
-        Stage: text like 'filing', 'trial', 'appeal', 'complete'
-        Returns True if updated successfully.
-        """
-        # Clamp progress to 0-100
-        progress = max(0, min(100, progress))
-        
-        with self.connect() as conn:
-            cursor = conn.execute(
-                "UPDATE cases SET progress = ?, stage = ? WHERE case_id = ? AND user_id = ?",
-                (progress, stage, case_id, user_id)
-            )
-            return cursor.rowcount > 0
-
-    # ==================== DOCUMENT METHODS ====================
     
-    def save_document(self, case_id: int, filename: str, parsed_text: str) -> int:
-        """Save parsed PDF/document text linked to a case."""
-        with self.connect() as conn:
+    def get_user_cases(self, user_id: int) -> List:
+        """Get all cases for a user from their tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM cases ORDER BY created_at DESC"
+            )
+            return cursor.fetchall()
+    
+    def get_case(self, user_id: int, case_id: int):
+        """Get a specific case from user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM cases WHERE case_id = ?",
+                (case_id,)
+            )
+            return cursor.fetchone()
+    
+    def update_case(self, user_id: int, case_id: int, **updates) -> bool:
+        """Update case fields in user's tenant database."""
+        if not updates:
+            return False
+        
+        set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
+        values = list(updates.values()) + [case_id]
+        
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute(
+                f"UPDATE cases SET {set_clause} WHERE case_id = ?",
+                values
+            )
+            return cursor.rowcount > 0
+    
+    def update_case_progress(self, user_id: int, case_id: int, progress: int, stage: str) -> bool:
+        """Update case progress in user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute(
+                "UPDATE cases SET progress = ?, stage = ? WHERE case_id = ?",
+                (progress, stage, case_id)
+            )
+            return cursor.rowcount > 0
+    
+    def delete_case(self, user_id: int, case_id: int) -> bool:
+        """Delete a case from user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
+            # Delete related records first
+            conn.execute("DELETE FROM chat_logs WHERE case_id = ?", (case_id,))
+            conn.execute("DELETE FROM documents WHERE case_id = ?", (case_id,))
+            cursor = conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
+            return cursor.rowcount > 0
+    
+    # ==================== DOCUMENT METHODS (Tenant DB) ====================
+    
+    def add_document(self, user_id: int, case_id: int, filename: str, parsed_text: str) -> int:
+        """Add a document to a case in user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
             cursor = conn.execute(
                 "INSERT INTO documents (case_id, filename, parsed_text) VALUES (?, ?, ?)",
                 (case_id, filename, parsed_text)
             )
             return cursor.lastrowid
-
-    def get_case_documents(self, case_id: int) -> List:
-        """Get all documents for a specific case."""
-        with self.connect() as conn:
-            return conn.execute(
+    
+    def get_case_documents(self, user_id: int, case_id: int) -> List:
+        """Get all documents for a case from user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute(
                 "SELECT * FROM documents WHERE case_id = ?",
                 (case_id,)
-            ).fetchall()
-
-    # ==================== CHAT METHODS ====================
+            )
+            return cursor.fetchall()
     
-    def add_chat_log(self, case_id: int, role: str, content: str):
-        """Add a chat message to the history."""
-        with self.connect() as conn:
+    # ==================== CHAT METHODS (Tenant DB) ====================
+    
+    def add_chat_log(self, user_id: int, case_id: int, role: str, content: str):
+        """Add a chat message in user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
             conn.execute(
                 "INSERT INTO chat_logs (case_id, role, content) VALUES (?, ?, ?)",
                 (case_id, role, content)
             )
-
-    def get_chat_history(self, case_id: int, limit: int = 10) -> List:
-        """Get recent chat history for a case."""
-        with self.connect() as conn:
+    
+    def get_chat_history(self, user_id: int, case_id: int, limit: int = 10) -> List:
+        """Get chat history for a case from user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
             cursor = conn.execute(
                 "SELECT role, content FROM chat_logs WHERE case_id = ? ORDER BY timestamp DESC LIMIT ?",
                 (case_id, limit)
             )
             rows = cursor.fetchall()
             return rows[::-1]  # Reverse to chronological order
-
-    def clear_chat_history(self, case_id: int):
-        """Clear all chat history for a case."""
-        with self.connect() as conn:
+    
+    def clear_chat_history(self, user_id: int, case_id: int):
+        """Clear chat history for a case in user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
             conn.execute("DELETE FROM chat_logs WHERE case_id = ?", (case_id,))
-
-    # ==================== AUDIT LOGGING METHODS ====================
     
-    def log_audit(
-        self, 
-        action: str, 
-        user_id: int = None, 
-        resource_type: str = None,
-        resource_id: int = None, 
-        ip_address: str = None,
-        user_agent: str = None,
-        details: str = None,
-        status: str = "success"
-    ):
-        """
-        Log an audit event for compliance and security tracking.
-        
-        Actions include:
-        - VIEW_CASE, EXPORT_PDF, DELETE_CLIENT, CREATE_CASE
-        - LOGIN, LOGOUT, FAILED_LOGIN
-        - UPLOAD_DOCUMENT, DELETE_DOCUMENT
-        - CHAT_MESSAGE, UPDATE_CASE
-        """
-        with self.connect() as conn:
+    # ==================== AUDIT METHODS (Tenant DB) ====================
+    
+    def log_audit(self, user_id: int, action: str, resource_type: str = None,
+                  resource_id: int = None, ip_address: str = None,
+                  user_agent: str = None, details: str = None, status: str = "success"):
+        """Log an audit event in the user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
             conn.execute("""
-                INSERT INTO audit_logs 
-                (user_id, action, resource_type, resource_id, ip_address, user_agent, details, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, action, resource_type, resource_id, ip_address, user_agent, details, status))
+                INSERT INTO audit_logs (action, resource_type, resource_id, ip_address, user_agent, details, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (action, resource_type, resource_id, ip_address, user_agent, details, status))
     
-    def get_audit_logs(
-        self, 
-        user_id: int = None, 
-        action: str = None,
-        resource_type: str = None,
-        limit: int = 100,
-        since: str = None
-    ) -> List:
-        """
-        Retrieve audit logs with optional filters.
-        
-        Args:
-            user_id: Filter by specific user
-            action: Filter by action type
-            resource_type: Filter by resource (case, document, client)
-            limit: Maximum records to return
-            since: ISO timestamp to filter logs after this time
-        """
-        with self.connect() as conn:
+    def get_audit_logs(self, user_id: int, action: str = None, 
+                       resource_type: str = None, limit: int = 100) -> List:
+        """Get audit logs from user's tenant database."""
+        with self.get_tenant_conn(user_id) as conn:
             query = "SELECT * FROM audit_logs WHERE 1=1"
             params = []
             
-            if user_id:
-                query += " AND user_id = ?"
-                params.append(user_id)
             if action:
                 query += " AND action = ?"
                 params.append(action)
             if resource_type:
                 query += " AND resource_type = ?"
                 params.append(resource_type)
-            if since:
-                query += " AND timestamp >= ?"
-                params.append(since)
             
             query += " ORDER BY timestamp DESC LIMIT ?"
             params.append(limit)
@@ -344,26 +385,30 @@ class DatabaseManager:
             cursor = conn.execute(query, params)
             return cursor.fetchall()
     
-    def get_user_activity(self, user_id: int, limit: int = 50) -> List:
-        """Get recent activity for a specific user."""
-        with self.connect() as conn:
+    def get_resource_access_history(self, user_id: int, resource_type: str, 
+                                     resource_id: int, limit: int = 50) -> List:
+        """Get access history for a specific resource."""
+        with self.get_tenant_conn(user_id) as conn:
             cursor = conn.execute("""
-                SELECT timestamp, action, resource_type, resource_id, ip_address, status 
-                FROM audit_logs 
-                WHERE user_id = ? 
-                ORDER BY timestamp DESC 
-                LIMIT ?
-            """, (user_id, limit))
-            return cursor.fetchall()
-    
-    def get_resource_access_history(self, resource_type: str, resource_id: int, limit: int = 50) -> List:
-        """Get access history for a specific resource (who viewed a case, etc.)."""
-        with self.connect() as conn:
-            cursor = conn.execute("""
-                SELECT timestamp, user_id, action, ip_address, status, details
+                SELECT timestamp, action, ip_address, status, details
                 FROM audit_logs 
                 WHERE resource_type = ? AND resource_id = ?
                 ORDER BY timestamp DESC 
                 LIMIT ?
             """, (resource_type, resource_id, limit))
             return cursor.fetchall()
+
+
+# Backward compatibility - create singleton instance
+_router_instance = None
+
+def get_db_router() -> DatabaseRouter:
+    """Get the singleton DatabaseRouter instance."""
+    global _router_instance
+    if _router_instance is None:
+        _router_instance = DatabaseRouter()
+    return _router_instance
+
+
+# Alias for backward compatibility with old code
+DatabaseManager = DatabaseRouter

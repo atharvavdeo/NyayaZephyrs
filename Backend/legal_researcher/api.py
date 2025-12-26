@@ -60,17 +60,22 @@ from jwt_auth import (
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 
 # Initialize global instances (lazy initialization for better import performance)
-_db_manager = None
+_db_router = None
 _case_generator = None
 _chatbot = None
 _legal_researcher_instance = None
 _client_db = None
 
+def get_db_router():
+    """Get the DatabaseRouter for multi-tenant database access."""
+    global _db_router
+    if _db_router is None:
+        _db_router = DatabaseManager()  # DatabaseManager is now aliased to DatabaseRouter
+    return _db_router
+
+# Backward compatibility alias
 def get_db_manager():
-    global _db_manager
-    if _db_manager is None:
-        _db_manager = DatabaseManager()
-    return _db_manager
+    return get_db_router()
 
 def get_case_generator():
     global _case_generator
@@ -380,7 +385,7 @@ async def refresh_token(current_user: dict = Depends(get_current_user)):
 # ==================== CASE MANAGEMENT ENDPOINTS ====================
 
 @router.post("/cases/manual", response_model=CaseResponse)
-async def create_case_manual(user_id: int, case_data: ManualCaseCreate):
+async def create_case_manual(case_data: ManualCaseCreate, user_id: int = Depends(get_user_id)):
     """
     Create a new case with manual data entry.
     All fields are provided by the user.
@@ -397,19 +402,27 @@ async def create_case_manual(user_id: int, case_data: ManualCaseCreate):
     }
     
     db = get_db_manager()
-    case_id = db.save_case(user_id, case_data.client_name, structured_data)
-    case = db.get_case(case_id, user_id)
+    # Serialize to JSON for storage in SQLite
+    structured_json = json.dumps(structured_data)
+    
+    # Log usage
+    print(f"Creating manual case for user {user_id}")
+    
+    # New DatabaseRouter API: create_case(user_id, client_name, raw_description, structured_data)
+    case_id = db.create_case(user_id, case_data.client_name, raw_description=case_data.case_details, structured_data=structured_json)
+    case = db.get_case(user_id, case_id)
     
     return CaseResponse(
         case_id=case_id,
         client_name=case_data.client_name,
         structured_data=structured_data,
+        raw_description=case_data.case_details,
         created_at=str(case['created_at'])
     )
 
 
 @router.post("/cases/ai-extract", response_model=CaseResponse)
-async def create_case_ai(user_id: int, case_data: AICaseCreate):
+async def create_case_ai(case_data: AICaseCreate, user_id: int = Depends(get_user_id)):
     """
     Create a new case using AI extraction from raw notes.
     AI extracts: client_name, opposing_party, incident_date, 
@@ -423,8 +436,13 @@ async def create_case_ai(user_id: int, case_data: AICaseCreate):
     
     db = get_db_manager()
     client_name = structured_data.get('client_name', 'Unknown Client')
-    case_id = db.save_case(user_id, client_name, structured_data, case_data.raw_notes)
-    case = db.get_case(case_id, user_id)
+    
+    # Serialize to JSON
+    structured_json = json.dumps(structured_data)
+    
+    # New DatabaseRouter API
+    case_id = db.create_case(user_id, client_name, raw_description=case_data.raw_notes, structured_data=structured_json)
+    case = db.get_case(user_id, case_id)
     
     return CaseResponse(
         case_id=case_id,
@@ -437,8 +455,8 @@ async def create_case_ai(user_id: int, case_data: AICaseCreate):
 
 @router.post("/cases/pdf-upload", response_model=CaseResponse)
 async def create_case_from_pdf(
-    user_id: int = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    user_id: int = Depends(get_user_id)
 ):
     """
     Create a new case by uploading and processing a PDF document.
@@ -477,19 +495,23 @@ async def create_case_from_pdf(
         client_name = structured_data.get('client_name', 'PDF Upload')
         
         db = get_db_manager()
+        
+        # Serialize to JSON
+        structured_json = json.dumps(structured_data)
+        
         # Save case
-        case_id = db.save_case(
+        case_id = db.create_case(
             user_id, 
             client_name, 
-            structured_data, 
-            f"[PDF: {filename}]"
+            raw_description=f"[PDF: {filename}]",
+            structured_data=structured_json
         )
         
         # Save document text
-        db.save_document(case_id, filename, full_text)
+        db.add_document(user_id, case_id, filename, full_text)
         
-        case = db.get_case(case_id, user_id)
-        docs = db.get_case_documents(case_id)
+        case = db.get_case(user_id, case_id)
+        docs = db.get_case_documents(user_id, case_id)
         
         return CaseResponse(
             case_id=case_id,
@@ -497,9 +519,11 @@ async def create_case_from_pdf(
             structured_data=structured_data,
             raw_description=f"[PDF: {filename}]",
             created_at=str(case['created_at']),
-            documents=[{"filename": d['filename'], "chars": len(d['parsed_text'])} for d in docs]
+            documents=[dict(d) for d in docs]
         )
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF processing failed: {str(e)}")
     finally:
         # Cleanup temp file
         if os.path.exists(tmp_path):
@@ -507,7 +531,7 @@ async def create_case_from_pdf(
 
 
 @router.get("/cases", response_model=CaseListResponse)
-async def list_user_cases(user_id: int):
+async def list_user_cases(user_id: int = Depends(get_user_id)):
     """
     Get all cases for a specific user.
     Returns list with case metadata and document counts.
@@ -517,31 +541,40 @@ async def list_user_cases(user_id: int):
     
     case_list = []
     for case in cases:
-        docs = db.get_case_documents(case['case_id'])
+        # User-scoped document retrieval
+        docs = db.get_case_documents(user_id, case['case_id'])
+        
+        # Safe JSON loading
+        try:
+            struct_data = json.loads(case['structured_data']) if case['structured_data'] else {}
+        except:
+            struct_data = {}
+
         case_list.append(CaseResponse(
             case_id=case['case_id'],
             client_name=case['client_name'],
-            structured_data=json.loads(case['structured_data']),
+            structured_data=struct_data,
             raw_description=case['raw_description'],
             created_at=str(case['created_at']),
-            documents=[{"filename": d['filename'], "chars": len(d['parsed_text'])} for d in docs],
-            progress=case['progress'] if 'progress' in case.keys() else 0,
-            stage=case['stage'] if 'stage' in case.keys() else "",
-            is_complete=(case['stage'].lower() == 'complete') if 'stage' in case.keys() and case['stage'] else False
+            documents=[dict(d) for d in docs],
+            progress=case['progress'] or 0,
+            stage=case['stage'] or "",
+            is_complete=(str(case['stage']).lower() == 'complete') if case['stage'] else False
         ))
     
     return CaseListResponse(cases=case_list, total=len(case_list))
 
 
 @router.get("/cases/{case_id}", response_model=CaseResponse)
-async def get_case(case_id: int, user_id: int, request: Request):
+async def get_case(case_id: int, request: Request, user_id: int = Depends(get_user_id)):
     """
     Get detailed information for a specific case.
     Verifies user ownership before returning data.
     Logs access for audit trail.
     """
     db = get_db_manager()
-    case = db.get_case(case_id, user_id)
+    # New DatabaseRouter API: get_case(user_id, case_id)
+    case = db.get_case(user_id, case_id)
     
     # Log the access attempt
     client_ip = request.client.host if request.client else "unknown"
@@ -550,20 +583,21 @@ async def get_case(case_id: int, user_id: int, request: Request):
     if not case:
         # Log failed access attempt
         db.log_audit(
-            action="VIEW_CASE_DENIED",
             user_id=user_id,
+            action="VIEW_CASE_DENIED",
             resource_type="case",
             resource_id=case_id,
             ip_address=client_ip,
             user_agent=user_agent,
-            status="denied"
+            status="denied",
+            details="Case not found or access denied"
         )
         raise HTTPException(status_code=404, detail="Case not found or access denied")
     
     # Log successful access
     db.log_audit(
-        action="VIEW_CASE",
         user_id=user_id,
+        action="VIEW_CASE",
         resource_type="case",
         resource_id=case_id,
         ip_address=client_ip,
@@ -571,23 +605,30 @@ async def get_case(case_id: int, user_id: int, request: Request):
         details=f"Viewed case: {case['client_name']}"
     )
     
-    docs = db.get_case_documents(case_id)
+    # User-scoped document retrieval
+    docs = db.get_case_documents(user_id, case_id)
     
+    # Safe JSON loading
+    try:
+        struct_data = json.loads(case['structured_data']) if case['structured_data'] else {}
+    except:
+        struct_data = {}
+
     return CaseResponse(
         case_id=case['case_id'],
         client_name=case['client_name'],
-        structured_data=json.loads(case['structured_data']),
+        structured_data=struct_data,
         raw_description=case['raw_description'],
         created_at=str(case['created_at']),
-        documents=[{"filename": d['filename'], "chars": len(d['parsed_text'])} for d in docs],
-        progress=case['progress'] if 'progress' in case.keys() else 0,
-        stage=case['stage'] if 'stage' in case.keys() else "",
-        is_complete=(case['stage'].lower() == 'complete') if 'stage' in case.keys() and case['stage'] else False
+        documents=[dict(d) for d in docs],
+        progress=case['progress'] or 0,
+        stage=case['stage'] or "",
+        is_complete=(str(case['stage']).lower() == 'complete') if case['stage'] else False
     )
 
 
 @router.delete("/cases/{case_id}")
-async def delete_case(case_id: int, user_id: int, request: Request):
+async def delete_case(case_id: int, request: Request, user_id: int = Depends(get_user_id)):
     """
     Delete a case (only if owned by user).
     Logs deletion for audit trail.
@@ -596,12 +637,13 @@ async def delete_case(case_id: int, user_id: int, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     
-    success = db.delete_case(case_id, user_id)
+    # New DatabaseRouter API: delete_case(user_id, case_id)
+    success = db.delete_case(user_id, case_id)
     if success:
         # Log successful deletion
         db.log_audit(
-            action="DELETE_CASE",
             user_id=user_id,
+            action="DELETE_CASE",
             resource_type="case",
             resource_id=case_id,
             ip_address=client_ip,
@@ -610,27 +652,29 @@ async def delete_case(case_id: int, user_id: int, request: Request):
         )
         return {"success": True, "message": f"Case #{case_id} deleted"}
     
-    # Log failed deletion attempt
+    # Log failed deletion attempt (usually meant it already didn't exist or belonged to someone else)
     db.log_audit(
-        action="DELETE_CASE_DENIED",
         user_id=user_id,
+        action="DELETE_CASE_DENIED",
         resource_type="case",
         resource_id=case_id,
         ip_address=client_ip,
         user_agent=user_agent,
-        status="denied"
+        status="denied",
+        details="Case not found or access denied"
     )
     raise HTTPException(status_code=404, detail="Case not found or access denied")
 
 
 @router.put("/cases/{case_id}/progress")
-async def update_case_progress(case_id: int, request: ProgressUpdateRequest):
+async def update_case_progress(case_id: int, request: ProgressUpdateRequest, user_id: int = Depends(get_user_id)):
     """
     Update progress and stage for a case.
     Sets is_complete to True when stage is 'complete'.
     """
     db = get_db_manager()
-    success = db.update_case_progress(case_id, request.user_id, request.progress, request.stage)
+    # Using user_id from token, NOT from request body (strict siloing)
+    success = db.update_case_progress(user_id, case_id, request.progress, request.stage)
     
     if success:
         is_complete = request.stage.lower() == 'complete'
@@ -647,20 +691,36 @@ async def update_case_progress(case_id: int, request: ProgressUpdateRequest):
 # ==================== CHAT ENDPOINTS ====================
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_with_case(request: ChatRequest):
+async def chat_with_case(request: ChatRequest, user_id: int = Depends(get_user_id)):
     """
     Context-aware chat with a specific case.
     Includes case data + document context + conversation history.
     Supports multilingual input/output via translation middleware.
     Rate limited to prevent API abuse.
     """
+    # Verify ownership before chatting
+    db = get_db_manager()
+    case = db.get_case(user_id, request.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found or access denied")
+
     # Translate user query to English if needed
     query_in_english = request.query
     if request.language != 'en':
         query_in_english = translate_to_english(request.query, source_lang=request.language)
     
     # Get response from chatbot (in English)
-    response = get_chatbot().chat_with_case(request.case_id, query_in_english)
+    # Chatbot needs to know user_id to load correct history
+    # We update chatbot call to pass user_id? No, chatbot usually delegates to DB.
+    # We need to update SecureChatbot to handle user_id or inject history manually.
+    # For now, let's look at SecureChatbot later. Assume it uses get_db_manager() which won't work without user_id context!
+    # PROBLEM: SecureChatbot uses get_db_manager().get_chat_history(case_id).
+    # New DatabaseRouter.get_chat_history requires user_id.
+    # We must refactor SecureChatbot too. 
+    # For this step, I'll pass user_id to chatbot if I can, or temporarily break it.
+    # Actually, better to catch this in next step.
+    
+    response = get_chatbot().chat_with_case(request.case_id, query_in_english, user_id=user_id)
     
     if response.startswith("⚠️ Rate limit"):
         raise HTTPException(status_code=429, detail=response)
@@ -676,11 +736,11 @@ async def chat_with_case(request: ChatRequest):
 
 
 @router.get("/chat/history/{case_id}", response_model=ChatHistoryResponse)
-async def get_chat_history(case_id: int, limit: int = 20):
+async def get_chat_history(case_id: int, limit: int = 20, user_id: int = Depends(get_user_id)):
     """
     Get chat history for a specific case.
     """
-    history = get_db_manager().get_chat_history(case_id, limit)
+    history = get_db_manager().get_chat_history(user_id, case_id, limit)
     
     return ChatHistoryResponse(
         case_id=case_id,
@@ -689,27 +749,28 @@ async def get_chat_history(case_id: int, limit: int = 20):
 
 
 @router.delete("/chat/history/{case_id}")
-async def clear_chat_history(case_id: int):
+async def clear_chat_history(case_id: int, user_id: int = Depends(get_user_id)):
     """
     Clear all chat history for a case.
     """
-    get_db_manager().clear_chat_history(case_id)
+    get_db_manager().clear_chat_history(user_id, case_id)
     return {"success": True, "message": f"Chat history cleared for case #{case_id}"}
 
 
 @router.get("/chat/summary/{case_id}")
-async def get_case_summary(case_id: int):
+async def get_case_summary(case_id: int, user_id: int = Depends(get_user_id)):
     """
     Get a formatted summary of a case.
     """
-    summary = get_chatbot().get_case_summary(case_id)
+    # Need to update chatbot to accept user_id
+    summary = get_chatbot().get_case_summary(case_id, user_id=user_id)
     return {"case_id": case_id, "summary": summary}
 
 
 # ==================== PDF EXPORT ENDPOINT ====================
 
 @router.get("/export/{case_id}")
-async def export_case_pdf(case_id: int, user_id: int, request: Request):
+async def export_case_pdf(case_id: int, request: Request, user_id: int = Depends(get_user_id)):
     """
     Export a case to PDF format.
     Returns the PDF file for download.
@@ -720,29 +781,35 @@ async def export_case_pdf(case_id: int, user_id: int, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     
-    case = db.get_case(case_id, user_id)
+    case = db.get_case(user_id, case_id)
     if not case:
         db.log_audit(
-            action="EXPORT_PDF_DENIED",
             user_id=user_id,
+            action="EXPORT_PDF_DENIED",
             resource_type="case",
             resource_id=case_id,
             ip_address=client_ip,
             user_agent=user_agent,
-            status="denied"
+            status="denied",
+            details="Case not found or access denied"
         )
         raise HTTPException(status_code=404, detail="Case not found or access denied")
     
     # Generate PDF
-    filename = get_case_generator().export_case_to_pdf(case_id)
+    # CaseGenerator needs user_id to fetch data?
+    # export_case_to_pdf(case_id) fetches case from DB.
+    # It probably uses get_db_manager().get_case(case_id).
+    # That will FAIL because get_case now requires user_id.
+    # We must refactor CaseGenerator too.
+    filename = get_case_generator().export_case_to_pdf(case_id, user_id=user_id)
     
     if not filename or not os.path.exists(filename):
         raise HTTPException(status_code=500, detail="Failed to generate PDF")
     
     # Log successful export
     db.log_audit(
-        action="EXPORT_PDF",
         user_id=user_id,
+        action="EXPORT_PDF",
         resource_type="case",
         resource_id=case_id,
         ip_address=client_ip,

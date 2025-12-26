@@ -46,14 +46,22 @@ class CaseGenerator:
             print(f"❌ Error generating case: {e}")
             return None
 
-    def export_case_to_pdf(self, case_id: int) -> str:
+    def export_case_to_pdf(self, case_id: int, user_id: int = None) -> str:
         """Generates a PDF summary of the case. Returns filename."""
-        case = self.db.get_case(case_id)
+        if user_id is None:
+             print("❌ Error: user_id required for multi-tenant access")
+             return None
+
+        # Secure DB access
+        case = self.db.get_case(user_id, case_id)
         if not case:
-            print("❌ Case not found.")
+            print("❌ Case not found or access denied.")
             return None
 
-        data = json.loads(case['structured_data'])
+        try:
+            data = json.loads(case['structured_data'])
+        except:
+            data = {}
         
         pdf = FPDF()
         pdf.add_page()
@@ -93,7 +101,7 @@ class CaseGenerator:
         # Create exports directory
         os.makedirs("exports", exist_ok=True)
         
-        client_name = data.get('client_name', 'Client').replace(" ", "_")
+        client_name = data.get('client_name', 'Client').replace(" ", "_").replace("/", "-")
         filename = f"exports/Case_{case_id}_{client_name}.pdf"
         pdf.output(filename)
         

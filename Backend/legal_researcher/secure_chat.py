@@ -40,7 +40,7 @@ class SecureChatbot:
         self.db = DatabaseManager()
         self.rate_limiter = RateLimiter(tokens_per_minute=20)  # Security layer
 
-    def chat_with_case(self, case_id: int, user_query: str) -> str:
+    def chat_with_case(self, case_id: int, user_query: str, user_id: int = None) -> str:
         """
         Context-Aware Chat with security guardrails.
         1. Sanitizes user input (prompt injection defense)
@@ -51,7 +51,9 @@ class SecureChatbot:
         6. Validates output and checks for hallucinations
         7. Saves response to DB
         """
-        
+        if user_id is None:
+             raise ValueError("user_id is required for multi-tenant access")
+
         # 1. Security Check - Rate Limiting
         if not self.rate_limiter.try_acquire():
             wait_time = self.rate_limiter.get_wait_time()
@@ -68,15 +70,18 @@ class SecureChatbot:
         if "[This query contains prohibited content" in sanitized_query:
             return "⚠️ I'm unable to process this request due to its content. Please rephrase your question about the legal case."
 
-        # 3. Get Case Context
-        case_row = self.db.get_case(case_id)
+        # 3. Get Case Context - REQUIRES user_id
+        case_row = self.db.get_case(user_id, case_id)
         if not case_row:
-            return "❌ Error: Case ID not found."
+            return "❌ Error: Case ID not found or access denied."
         
-        case_data = json.loads(case_row['structured_data'])
+        try:
+            case_data = json.loads(case_row['structured_data'])
+        except:
+            case_data = {}
         
-        # 4. Get Conversation History (Last 5)
-        history_rows = self.db.get_chat_history(case_id, limit=5)
+        # 4. Get Conversation History (Last 5) - REQUIRES user_id
+        history_rows = self.db.get_chat_history(user_id, case_id, limit=5)
         history = [{"role": row['role'], "content": row['content']} for row in history_rows]
         
         # 5. Build Secure Messages (Proper Role Separation)
@@ -98,28 +103,21 @@ class SecureChatbot:
             )
             response = completion.choices[0].message.content
             
-            # 7. Output Validation (Harmful Content Filter)
-            validated_response, output_warnings, is_blocked = validate_output(response)
+            # 7. Output Validation
+            is_safe, failure_reason = validate_output(response)
+            if not is_safe:
+                logger.warning(f"Output validation failed: {failure_reason}")
+                return f"⚠️ Parameters of the response were unsafe: {failure_reason}"
             
-            for warning in output_warnings:
-                logger.warning(f"Output validation: {warning}")
+            # 8. Hallucination Checker (verify citations against case facts)
+            fact_check_result = verify_citations(response, case_data)
+            final_response = response
+            if fact_check_result["warning"]:
+                final_response += f"\n\n⚠️ **Hallucination Warning:** {fact_check_result['warning']}"
             
-            if is_blocked:
-                return "⚠️ The AI generated a response that was filtered for safety reasons. Please try a different question."
-            
-            # 8. Hallucination Check (Citation Verification)
-            final_response, citation_warnings = verify_citations(
-                validated_response, 
-                self.db, 
-                case_id
-            )
-            
-            for warning in citation_warnings:
-                logger.warning(f"Hallucination check: {warning}")
-            
-            # 9. Save to DB (Both user query and assistant response)
-            self.db.add_chat_log(case_id, "user", sanitized_query)
-            self.db.add_chat_log(case_id, "assistant", final_response)
+            # 9. Save to DB (Both user query and assistant response) - REQUIRES user_id
+            self.db.add_chat_log(user_id, case_id, "user", sanitized_query)
+            self.db.add_chat_log(user_id, case_id, "assistant", final_response)
             
             return final_response
             
@@ -127,13 +125,19 @@ class SecureChatbot:
             logger.error(f"API Error: {e}")
             return f"❌ API Error: {e}"
     
-    def get_case_summary(self, case_id: int) -> str:
+    def get_case_summary(self, case_id: int, user_id: int = None) -> str:
         """Returns a formatted summary of the case."""
-        case_row = self.db.get_case(case_id)
+        if user_id is None:
+             return "Error: user_id required"
+
+        case_row = self.db.get_case(user_id, case_id)
         if not case_row:
             return "Case not found."
         
-        data = json.loads(case_row['structured_data'])
+        try:
+            data = json.loads(case_row['structured_data'])
+        except:
+            data = {}
         
         summary = f"\n{'='*50}\n"
         summary += f"📁 CASE #{case_id} SUMMARY\n"

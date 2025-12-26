@@ -1,109 +1,231 @@
-# Legal AI Dashboard
+# ⚖️ ZeroDay: Advanced Legal AI Platform
 
-## Overview
-**Legal AI Dashboard** is a sophisticated, full-stack SaaS application designed for legal professionals to automate document analysis. It leverages advanced Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) to process legal documents (PDFs), extracting critical metadata, summaries, facts, reasoning, and verdicts. The platform features a premium, vintage law office aesthetic powered by modern AI technology.
+> **Status**: Active Development  
+> **Version**: 2.0.0 (Multi-Tenant Architecture)  
+> **Security Level**: High (JWT, Audit Logging, Data Siloing)
+
+## 📖 Table of Contents
+1. [Executive Summary](#-executive-summary)
+2. [Master Architecture](#-master-architecture)
+3. [Multi-Tenant Database System](#-multi-tenant-database-system)
+4. [Security & Compliance](#-security--compliance)
+5. [AI & RAG Architecture](#-ai--rag-architecture)
+6. [API Reference](#-api-reference)
+7. [Frontend Dashboard](#-frontend-dashboard)
+8. [Installation & Setup](#-installation--setup)
 
 ---
 
-## 🚀 Key Features
+## 🚀 Executive Summary
 
-*   **📄 Deep Document Analysis:** Automatically extracts:
-    *   **Case Title / Parties** (Appellant vs Respondent)
-    *   **Case Number** & **Judge Name**
-    *   **Document Type** (Order, Judgment, etc.)
-    *   **Detailed Summary** (concise & comprehensive)
-    *   **Key Facts** & **Legal Reasoning**
-    *   **Final Verdict** (prioritizing final orders over historical ones)
+**ZeroDay** is a production-grade AI platform designed for legal professionals to manage cases, perform automated legal research, and interact with case documents using secure, context-aware AI. 
+
+Unlike standard LegalWrappers, ZeroDay implements a **defense-in-depth security architecture** featuring strict multi-tenancy, immutable audit logging, and AI guardrails to prevent hallucinations and prompt injection attacks.
+
+---
+
+## 🏗️ Master Architecture
+
+The platform follows a **Secure Monorepo** structure with a decoupled React frontend and a FastAPI backend.
+
+```mermaid
+graph TD
+    User[Legal Professional] -->|HTTPS/TLS| FE[React Frontend]
+    FE -->|JWT Auth Bearer| API[FastAPI Backend]
     
-*   **🔍 Hybrid Extraction Engine:**
-    *   Uses **Targeted Vector Search** to find header information (Page 1).
-    *   Implements **Regex Fallback** (`X vs Y`) to ensure party names are never blank.
-    *   **Self-Correcting LLM:** Injects regex findings as hints to the model.
-
-*   **💬 Interactive Legal Chatbot:**
-    *   Ask questions about the uploaded document.
-    *   Get precise answers with **citations**.
-    *   Maintains conversation history/memory.
-
-*   **📊 Dashboard & Statistics:**
-    *   Track **Total Documents Analyzed**.
-    *   Monitor **Total Queries Asked**.
-    *   Visualize **Time Saved** (estimated vs manual review).
-    *   View ongoing and completed case lists.
-
-*   **🗄️ robust Document Management:**
-    *   **Previous History:** Click any past document to instantly load its stored analysis and chat history.
-    *   **Re-Analyze:** Manually trigger a fresh deep-scan if needed.
-    *   **Full Summary View:** Modal view for reading extensive legal details.
-
----
-
-## 🏗️ Architecture
-
-### **Tech Stack**
-
-| Layer | Technology | Description |
-|-------|------------|-------------|
-| **Frontend** | React 18 + Vite | Fast, responsive UI with TypeScript |
-| **Styling** | TailwindCSS | Utility-first styling with custom "Law Firm" theme |
-| **Animations** | Framer Motion | Smooth transitions & micro-interactions |
-| **Backend** | FastAPI (Python) | High-performance async API |
-| **Database** | SQLite + SQLAlchemy | Persistent storage for docs & metadata |
-| **Vector DB** | Pinecone | Serverless vector storage for RAG |
-| **LLM** | Groq (Llama 3.3) | 70B parameter model for high-quality generation |
-| **Embeddings** | HuggingFace | `all-mpnet-base-v2` (768d) on GPU |
-| **PDF Parser** | PyMuPDF (fitz) | Reliable text extraction from legal PDFs |
-
-### **Data Flow**
-
-1.  **Upload:** PDF → PyMuPDF → Text Chunks → Embeddings (HF) → Pinecone Vector Store.
-2.  **Extraction:** Targeted Search/Regex → LLM Prompt → JSON Extraction → SQLite Database.
-3.  **Chat:** User Query → Vector Search (MMR) → Context Assembly → LLM Generation → Response.
-
----
-
-## 🎨 Design System
-
-*   **Theme:** "Warm Vintage Law Office"
-*   **Colors:**
-    *   Background: Parchment Cream (`#f5f1e8`)
-    *   Cards: Light Beige (`#f5e6c8`) & Tan (`#d4c4a8`)
-    *   Accent: Vibrant Orange (`#f97316`) for Actions
-    *   Text: Deep Brown-Black (`#1a1a1a`)
-*   **Typography:** Times New Roman / Georgia (Serif) + Montserrat (Sans-Serif)
-
----
-
-## 🛠️ Setup & Installation
-
-### **Prerequisites**
-*   Node.js (v18+)
-*   Python (v3.11+)
-*   Pinecone API Key
-*   Groq API Key
-
-### **1. Backend Setup**
-```bash
-cd Backend/Zephyr
-python -m venv venv
-# Activate venv (Windows: venv\Scripts\activate, Mac/Linux: source venv/bin/activate)
-pip install -r requirements.txt
-# Create .env file with GROQ_API_KEY and PINECONE_API_KEY
-uvicorn src.app:app --reload --port 8000
+    subgraph "Backend Security Layer"
+        API -->|Validate Token| JWT[JWT Auth Service]
+        API -->|Rate Limit| RL[Rate Limiter]
+        API -->|Sanitize Input| GR[Guardrails Engine]
+    end
+    
+    subgraph "Data Persistence Layer"
+        API -->|Route Request| Router[Database Router]
+        Router -->|Auth/User Data| MasterDB[(Master Auth DB)]
+        Router -->|Case Data| TenantDB[(Tenant DB: lawyer_X.db)]
+    end
+    
+    subgraph "AI Processing Layer"
+        API -->|Context| Chat[Secure Chatbot]
+        API -->|Extraction| Gen[Case Generator]
+        Chat <-->|Inference| Groq[Groq LPU (Llama 3)]
+        Gen <-->|Research| Firecrawl[Firecrawl Search]
+    end
 ```
 
-### **2. Frontend Setup**
+---
+
+## 🗄️ Multi-Tenant Database System
+
+We have migrated from a monolithic database to a **Database-per-Tenant** architecture to ensure maximum data isolation and GDPR compliance.
+
+### The Database Router Pattern
+The `DatabaseRouter` class (`database_manager.py`) intelligently routes queries based on the authenticated context.
+
+1.  **Master Database (`master_auth.db`)**
+    *   **Purpose**: Stores global user identities and authentication credentials.
+    *   **Tables**: `users`, `auth_audit_logs`.
+    *   **Security**: Minimal PII. No case data.
+
+2.  **Tenant Databases (`databases/lawyer_{id}.db`)**
+    *   **Purpose**: Isolated storage for a specific lawyer's cases, documents, and chat logs.
+    *   **Isolation**: File-level separation. A lawyer CANNOT query another lawyer's file physically.
+    *   **Tables**: `cases`, `documents`, `chat_logs`, `audit_logs`.
+
+### Schema Details
+
+#### Master Schema
+```sql
+CREATE TABLE users (
+    user_id INTEGER PRIMARY KEY,
+    username TEXT UNIQUE,
+    password_hash TEXT, -- Bcrypt
+    email TEXT
+);
+```
+
+#### Tenant Schema (Replicated per User)
+```sql
+CREATE TABLE cases (
+    case_id INTEGER PRIMARY KEY,
+    client_name TEXT,
+    structured_data JSON, -- AI extracted metadata
+    progress INTEGER,
+    stage TEXT
+);
+
+CREATE TABLE documents (
+    doc_id INTEGER PRIMARY KEY,
+    case_id INTEGER REFERENCES cases(case_id),
+    parsed_text TEXT, -- Full text for RAG
+    uploaded_at TIMESTAMP
+);
+
+CREATE TABLE audit_logs (
+    log_id INTEGER PRIMARY KEY,
+    action TEXT, -- e.g., 'VIEW_CASE', 'EXPORT_PDF'
+    resource_id INTEGER,
+    ip_address TEXT,
+    timestamp TIMESTAMP
+);
+```
+
+---
+
+## 🔒 Security & Compliance
+
+ZeroDay implements a **Zero Trust** security model.
+
+### 1. Authentication (Stateless JWT)
+*   **Token**: JSON Web Tokens (HS256) with configurable expiry.
+*   **Hashing**: Passwords hashed using `bcrypt` (work factor 12).
+*   **Flow**:
+    1.  User POSTs credentials to `/auth/login`.
+    2.  Server returns `access_token`.
+    3.  Client attaches header: `Authorization: Bearer <token>`.
+    4.  `Depends(get_user_id)` validates token and extracts `user_id` for routing.
+
+### 2. Authorization (Strict Siloing)
+*   Every database operation requires a `user_id` context.
+*   The `DatabaseRouter` constructs the path `databases/lawyer_{user_id}.db`.
+*   **Impossible Cross-Tenant Access**: It is physically impossible for User A to query User B's cases because the file path would be different.
+
+### 3. Audit Logging (Immutable)
+Every critical action is logged to the tenant's `audit_logs` table (or master `auth_audit_logs`).
+*   **Logged Events**: Login (Success/Fail), View Case, Delete Case, Export PDF, AI Chat.
+*   **Data Fields**: IP Address, User Agent, Timestamp, Resource ID, Action Status.
+*   **Admin Dashboard**: Visualizes these logs for compliance reviews.
+
+### 4. AI Guardrails (`guardrails.py`)
+*   **Input Sanitization**: Regex filters to block prompt injection (e.g., "Ignore previous instructions").
+*   **Output Validation**: Checks response for safety / prohibited content.
+*   **Hallucination Checker**: Verifies that citations in AI response actually exist in the provided context/documents.
+
+---
+
+## 🤖 AI & RAG Architecture
+
+The platform uses a specialized RAG (Retrieval-Augmented Generation) pipeline optimized for legal texts.
+
+### 1. Ingestion Pipeline
+1.  **PDF Upload**: `PyPDF2` extracts text from legal documents.
+2.  **Text Cleaning**: Normalization of whitespace and legal artifacts.
+3.  **Storage**: Raw text is stored in `documents` table (Tenant DB).
+
+### 2. AI Extraction Engine (`CaseGenerator`)
+*   **Problem**: Unstructured client notes/PDFs.
+*   **Solution**: Single-shot prompting with `Llama-3-70b` to extract secure JSON structure.
+*   **Fields**: `client_name`, `opposing_party`, `legal_issues`, `key_evidence`.
+
+### 3. Context-Aware Chat (`SecureChatbot`)
+1.  **Context Retrieval**: Fetches Case Metadata + Case Documents + Chat History (Last 5 messages).
+2.  **Prompt Engineering**: Uses rigid system prompts to enforce "Legal Assistant" persona.
+3.  **Inference**: User Query + Context sent to Groq LPU (Low Latency Processing Unit).
+4.  **Verification**: Response is cross-checked against case facts before returning to user.
+
+---
+
+## 📡 API Reference
+
+Base URL: `/legal`
+
+### Auth
+*   `POST /auth/register`: Create account.
+*   `POST /auth/login`: Get JWT.
+*   `POST /auth/refresh`: Refresh token.
+
+### Case Management
+*   `GET /cases`: List all cases (Tenant-scoped).
+*   `POST /cases/manual`: Create case manually.
+*   `POST /cases/ai-extract`: Create case from raw text.
+*   `POST /cases/pdf-upload`: Create case from PDF.
+*   `GET /cases/{id}`: Get details + documents.
+*   `DELETE /cases/{id}`: Delete case (GDPR compliant).
+
+### Chat
+*   `POST /chat`: Interact with case context.
+*   `GET /chat/history/{case_id}`: Get conversation.
+
+### Admin & Security
+*   `GET /audit/logs`: Fetch security logs.
+*   `GET /stats/{user_id}`: Dashboard metrics.
+
+---
+
+## 💻 Frontend Dashboard
+
+The frontend (`landing1`) is a modern React application built with:
+*   **Vite + TypeScript**: For performance and type safety.
+*   **Framer Motion**: Smooth transitions and sleek UI.
+*   **Admin Dashboard**: A dedicated security view (`/admin`) displaying audit trails, vulnerability status, and system health.
+
+---
+
+## 🛠️ Installation & Setup
+
+### Prerequisites
+*   Python 3.9+
+*   Node.js 18+
+*   Groq API Key
+
+### Backend Setup
+```bash
+cd Backend/legal_researcher
+# Create virtual env
+python -m venv venv
+source venv/bin/activate
+
+# Install deps
+pip install -r requirements.txt
+
+# Environment Setup
+cp .env.example .env
+# Edit .env with your keys
+```
+
+### Frontend Setup
 ```bash
 cd landing1
 npm install
 npm run dev
 ```
-
----
-
-## 🔄 Recent Updates (v1.2)
-*   **Fixed:** "Blank Case Name" issue resolved with Hybrid Regex+Vector extraction.
-*   **Fixed:** VectorStore connectivity issues.
-*   **Added:** `appellant`, `respondent`, `victim` metadata fields to database.
-*   **Added:** "View Full Summary" modal for reading extensive analysis.
-*   **Improved:** Optimized card hover animations (reduced latency).
