@@ -428,319 +428,175 @@ const documentLibrary = [
   { name: "Gupta vs Union", date: "Dec 10, 2024" },
 ];
 
-// Sidebar Component
-function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher"; onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
-  // Try to use language context, but provide fallback for landing page
+// Top Navbar Component (replaces Sidebar)
+function TopNavbar({ activePage, onNavigate }: { activePage: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher"; onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // Try to use language context, but provide fallback
   let t = (key: string) => key;
   try {
     const langContext = useLanguage();
     t = langContext.t;
   } catch (e) {
-    // Not wrapped in LanguageProvider (landing page), use fallback
+    // Not wrapped in LanguageProvider, use fallback
   }
 
-  return (
-    <div className="w-64 bg-[#f3eed2] border-r border-[#d4cdb8] flex flex-col h-screen fixed left-0 top-0 z-50">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 bg-[#f97316] rounded flex items-center justify-center">
-          <span className="text-white font-bold text-lg">M</span>
-        </div>
-        <span className="text-[20px] font-bold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>ZEPHYRS AI</span>
-      </div>
+  // Handle scroll effect
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-      <div className="flex-1 px-4 py-6 space-y-2">
-        <button
-          onClick={() => onNavigate("dashboard")}
-          className={cn(
-            "w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors",
-            activePage === "dashboard" ? "bg-[#e5ddd0] text-[#1a1a1a] font-medium" : "text-[#666] hover:bg-[#e5ddd0]/50"
-          )}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('dashboard')}</span>
-        </button>
-        <button
-          onClick={() => onNavigate("clients")}
-          className={cn(
-            "w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors",
-            activePage === "clients" ? "bg-[#e5ddd0] text-[#1a1a1a] font-medium" : "text-[#666] hover:bg-[#e5ddd0]/50"
-          )}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('clients')}</span>
-        </button>
-        <button
-          onClick={() => onNavigate("my-cases")}
-          className={cn(
-            "w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors",
-            activePage === "my-cases" ? "bg-[#e5ddd0] text-[#1a1a1a] font-medium border-l-4 border-[#f97316]" : "text-[#666] hover:bg-[#e5ddd0]/50"
-          )}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-          </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('my_cases')}</span>
-        </button>
-        <button
-          onClick={() => onNavigate("documents")}
-          className={cn(
-            "w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors",
-            activePage === "documents" ? "bg-[#e5ddd0] text-[#1a1a1a] font-medium border-l-4 border-[#f97316]" : "text-[#666] hover:bg-[#e5ddd0]/50"
-          )}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('documents')}</span>
-        </button>
-        <button
-          onClick={() => onNavigate("settings")}
-          className={cn(
-            "w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors",
-            activePage === "settings" ? "bg-[#e5ddd0] text-[#1a1a1a] font-medium border-l-4 border-[#f97316]" : "text-[#666] hover:bg-[#e5ddd0]/50"
-          )}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('settings')}</span>
-        </button>
-        <button
-          onClick={() => onNavigate("legal-researcher")}
-          className={cn(
-            "w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors",
-            activePage === "legal-researcher" ? "bg-[#e5ddd0] text-[#1a1a1a] font-medium border-l-4 border-[#f97316]" : "text-[#666] hover:bg-[#e5ddd0]/50"
-          )}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('legal_researcher')}</span>
-        </button>
-      </div>
-
-      {/* Language Selector */}
-      <div className="px-4 py-3 border-t border-[#d4cdb8]">
-        <LanguageSelector />
-      </div>
-
-      <div className="p-6 border-t border-[#d4cdb8]">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold">JD</div>
-          <div>
-            <p className="text-[14px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>John Doe</p>
-            <p className="text-[12px] text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>Premium License</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// My Cases Page Component
-function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
-  const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
+  const navItems = [
+    {
+      id: "dashboard" as const, label: t('dashboard'), icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </svg>
+      )
+    },
+    {
+      id: "clients" as const, label: t('clients'), icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      )
+    },
+    {
+      id: "documents" as const, label: t('documents'), icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      )
+    },
+    {
+      id: "legal-researcher" as const, label: t('legal_researcher'), icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      )
+    },
+    {
+      id: "settings" as const, label: t('settings'), icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )
+    },
+  ];
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
-      {/* Background Elements */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `linear-gradient(to right, rgba(139, 115, 85, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(139, 115, 85, 0.15) 1px, transparent 1px)`,
-          backgroundSize: "40px 40px"
-        }} />
-        <div className="absolute inset-0 z-[1]" style={{
-          background: `radial-gradient(circle at 20% 30%, rgba(245, 222, 179, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(222, 184, 135, 0.2) 0%, transparent 50%)`
-        }} />
-        {/* Animated Blocks */}
-        <div className="absolute inset-0 z-[2]">
-          {blocks.map((block) => (
-            <motion.div
-              key={block.id}
-              initial={{ opacity: 0, scale: 0.8, rotate: block.rotation - 15 }}
-              animate={{ opacity: [0.5, 0.7, 0.5], scale: 1, rotate: block.rotation, y: [0, -8, 0] }}
-              transition={{ duration: 3, delay: block.delay, ease: "easeInOut", opacity: { duration: 4, repeat: Infinity, repeatType: "reverse" }, y: { duration: 6, repeat: Infinity, repeatType: "reverse" } }}
-              className="absolute"
-              style={{ left: `${block.x}%`, top: `${block.y}%`, width: `${block.width}px`, height: `${block.height}px` }}
-            >
-              <div className="w-full h-full rounded-sm bg-gradient-to-br from-[#f4e4c1]/90 to-[#e8d4a8]/85 border-2 border-[#d4b896]/60 shadow-[0_4px_16px_rgba(139,115,85,0.25)] backdrop-blur-[2px]" />
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Sidebar */}
-      <Sidebar activePage="my-cases" onNavigate={onNavigate} />
-
-      {/* Main Content */}
-      <div className="flex-1 relative z-10 ml-64 p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="mb-6 flex justify-between items-end">
-            <div>
-              <h1 className="text-[32px] font-normal text-[#1a1a1a] mb-2" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>MY CASES</h1>
-              <p className="text-[#666] font-normal" style={{ fontFamily: "Montserrat, sans-serif" }}>Manage and track your legal research status.</p>
+    <nav className={cn(
+      "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+      scrolled
+        ? "bg-[#f3eed2]/95 backdrop-blur-md shadow-lg py-2"
+        : "bg-[#f3eed2] py-3"
+    )}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-[#f97316] rounded flex items-center justify-center">
+              <span className="text-white font-bold text-lg">M</span>
             </div>
-            <button className="px-5 py-2 bg-[#1a1a1a] text-[#f5f1e8] text-[13px] font-medium rounded hover:bg-[#333] transition-colors tracking-wide">
-              EXPORT ALL DATA
+            <span className="text-[18px] font-bold text-[#1a1a1a] hidden sm:block" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>ZEPHYRS AI</span>
+          </div>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                className={cn(
+                  "px-4 py-2 rounded-lg flex items-center gap-2 transition-all text-sm font-medium",
+                  activePage === item.id
+                    ? "bg-[#f97316] text-white shadow-md"
+                    : "text-[#666] hover:bg-[#e5ddd0] hover:text-[#1a1a1a]"
+                )}
+                style={{ fontFamily: "Montserrat, sans-serif" }}
+              >
+                {item.icon}
+                <span className="hidden lg:inline">{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Right side - Language selector and user */}
+          <div className="flex items-center gap-3">
+            {/* Language Selector */}
+            <div className="hidden sm:block">
+              <LanguageSelector />
+            </div>
+
+            {/* User Profile */}
+            <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[#d4cdb8]">
+              <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">JD</div>
+              <div className="hidden lg:block">
+                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>John Doe</p>
+              </div>
+            </div>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-[#e5ddd0] transition-colors"
+            >
+              <svg className="w-6 h-6 text-[#1a1a1a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {isMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
             </button>
           </div>
+        </div>
 
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left Column: Timeline */}
-            <div className="flex-1 space-y-8 bg-white/50 backdrop-blur-sm rounded-xl p-6 border border-[#d4b896]/30">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[16px] font-bold text-[#1a1a1a] tracking-wider" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>CASE TIMELINE</h3>
-                <button className="text-[11px] font-bold text-[#f97316] bg-[#f97316]/10 px-3 py-1 rounded hover:bg-[#f97316]/20 transition-colors">INTERACTIVE VIEW</button>
-              </div>
-
-              {/* TIMELINE GROUPS */}
-              <div className="space-y-8 relative pl-4 border-l-2 border-[#d4b896]/30">
-
-                {/* TODAY */}
-                <div className="space-y-4">
-                  <div className="absolute -left-[9px] mt-1.5 w-4 h-4 bg-[#f97316] rounded-full border-4 border-[#f5f1e8]"></div>
-                  <h4 className="text-[12px] font-bold text-[#f97316] uppercase tracking-wide pl-4">TODAY</h4>
-
-                  <motion.div
-                    whileHover={{ scale: 1.01, boxShadow: "0 10px 30px rgba(0,0,0,0.05)" }}
-                    className="bg-[#f5f1e8] p-5 rounded-lg border border-[#e5e0d5] relative overflow-hidden group cursor-pointer"
-                  >
-                    <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-green-500"></div>
-                    <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Smith v. State of California</h5>
-                    <p className="text-[13px] text-[#666] mb-4">Found 12 citations | accessed 2h ago</p>
-                    <div className="h-1.5 bg-[#e5e0d5] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#f97316] w-[65%] rounded-full"></div>
-                    </div>
-                  </motion.div>
-
-                  <motion.div
-                    whileHover={{ scale: 1.01, boxShadow: "0 10px 30px rgba(0,0,0,0.05)" }}
-                    className="bg-[#f5f1e8] p-5 rounded-lg border border-[#e5e0d5] relative overflow-hidden group cursor-pointer"
-                  >
-                    <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-yellow-500"></div>
-                    <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Patent Hearing: TechCorp</h5>
-                    <p className="text-[13px] text-[#666]">Audio Transcript | accessed 4h ago</p>
-                  </motion.div>
-                </div>
-
-                {/* YESTERDAY */}
-                <div className="space-y-4">
-                  <div className="absolute -left-[7px] mt-1.5 w-3 h-3 bg-[#ccc] rounded-full border-2 border-[#f5f1e8]"></div>
-                  <h4 className="text-[12px] font-bold text-[#999] uppercase tracking-wide pl-4">YESTERDAY</h4>
-
-                  <motion.div
-                    whileHover={{ scale: 1.01, boxShadow: "0 10px 30px rgba(0,0,0,0.05)" }}
-                    className="bg-[#f5f1e8] p-5 rounded-lg border border-[#e5e0d5] relative overflow-hidden group cursor-pointer"
-                  >
-                    <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-green-500"></div>
-                    <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Estate of J.R. Ewing</h5>
-                    <p className="text-[13px] text-[#666] mb-4">Probate | accessed 1d ago</p>
-                    <div className="h-1.5 bg-[#e5e0d5] rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-600 w-[45%] rounded-full"></div>
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* LAST WEEK */}
-                <div className="space-y-4">
-                  <div className="absolute -left-[7px] mt-1.5 w-3 h-3 bg-[#ccc] rounded-full border-2 border-[#f5f1e8]"></div>
-                  <h4 className="text-[12px] font-bold text-[#999] uppercase tracking-wide pl-4">LAST WEEK</h4>
-
-                  <motion.div
-                    whileHover={{ scale: 1.01, boxShadow: "0 10px 30px rgba(0,0,0,0.05)" }}
-                    className="bg-[#f5f1e8] p-5 rounded-lg border border-[#e5e0d5] relative overflow-hidden group cursor-pointer"
-                  >
-                    <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-blue-500"></div>
-                    <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>SolarTech Merger Acquisition</h5>
-                    <p className="text-[13px] text-[#666]">Due Diligence Review | accessed 4d ago</p>
-                  </motion.div>
-                </div>
-
-              </div>
+        {/* Mobile Navigation */}
+        {isMenuOpen && (
+          <div className="md:hidden mt-3 pb-3 border-t border-[#d4cdb8] pt-3">
+            <div className="flex flex-col gap-1">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onNavigate(item.id);
+                    setIsMenuOpen(false);
+                  }}
+                  className={cn(
+                    "px-4 py-3 rounded-lg flex items-center gap-3 transition-all text-sm font-medium w-full text-left",
+                    activePage === item.id
+                      ? "bg-[#f97316] text-white"
+                      : "text-[#666] hover:bg-[#e5ddd0]"
+                  )}
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
             </div>
-
-            {/* Right Column: Widgets */}
-            <div className="w-full lg:w-[350px] space-y-6">
-
-              {/* Weekly Activity */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-white p-6 rounded-xl shadow-sm border border-[#e5e0d5]"
-              >
-                <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-6 tracking-widest uppercase" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>WEEKLY ACTIVITY</h3>
-                <div className="flex justify-between items-end h-[120px] px-2">
-                  <div className="w-8 bg-[#f5f5f5] h-[40%] rounded-sm"></div>
-                  <div className="w-8 bg-[#f5f5f5] h-[60%] rounded-sm"></div>
-                  <div className="w-8 bg-[#f5f5f5] h-[50%] rounded-sm"></div>
-                  <div className="w-10 bg-[#f97316]/10 h-[90%] rounded-sm relative">
-                    <div className="absolute top-0 w-full h-1 bg-[#f97316]"></div>
-                  </div>
-                  <div className="w-8 bg-[#f5f5f5] h-[30%] rounded-sm"></div>
-                </div>
-                <div className="flex justify-between mt-3 text-[10px] text-[#999] px-3 font-mono">
-                  <span>M</span>
-                  <span>T</span>
-                  <span>W</span>
-                  <span>T</span>
-                  <span>F</span>
-                </div>
-              </motion.div>
-
-              {/* Recent Uploads */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-white p-6 rounded-xl shadow-sm border border-[#e5e0d5]"
-              >
-                <h3 className="text-[14px] font-bold text-[#1a1a1a] mb-6 tracking-widest uppercase" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>RECENT UPLOADS</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 rounded flex items-center justify-center text-red-500 font-bold text-xs">D</div>
-                    <div className="flex-1">
-                      <p className="text-[13px] font-bold text-[#1a1a1a]">contracts_v2.pdf</p>
-                      <p className="text-[11px] text-[#999]">TODAY, 10:42 AM</p>
-                    </div>
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center text-blue-500 font-bold text-xs">F</div>
-                    <div className="flex-1">
-                      <p className="text-[13px] font-bold text-[#1a1a1a]">brief_draft_final.docx</p>
-                      <p className="text-[11px] text-[#999]">YESTERDAY, 4:15 PM</p>
-                    </div>
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-500 font-bold text-xs">T</div>
-                    <div className="flex-1">
-                      <p className="text-[13px] font-bold text-[#1a1a1a]">notes_meeting.txt</p>
-                      <p className="text-[11px] text-[#999]">MON, 9:00 AM</p>
-                    </div>
-                    <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                  </div>
-                </div>
-              </motion.div>
-
+            <div className="mt-3 pt-3 border-t border-[#d4cdb8] flex items-center justify-between">
+              <LanguageSelector />
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">JD</div>
+                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>John Doe</p>
+              </div>
             </div>
           </div>
-
-        </div>
+        )}
       </div>
-    </div>
+    </nav>
   );
 }
 
+
 // Documents Page Component
-function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -950,10 +806,10 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       </div>
 
       {/* Sidebar */}
-      <Sidebar activePage="documents" onNavigate={onNavigate} />
+      <TopNavbar activePage="documents" onNavigate={onNavigate} />
 
       {/* Main Content */}
-      <div className="flex-1 relative z-10 ml-64 p-8">
+      <div className="flex-1 relative z-10 pt-20 p-8">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
           <div className="mb-8">
@@ -1272,7 +1128,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 }
 
 // Dashboard Page Component
-function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
   const [dashboardStats, setDashboardStats] = useState({
     documents_analyzed: 0,
@@ -1399,10 +1255,10 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       </div>
 
       {/* Sidebar */}
-      <Sidebar activePage="dashboard" onNavigate={onNavigate} />
+      <TopNavbar activePage="dashboard" onNavigate={onNavigate} />
 
       {/* Main Content */}
-      <div className="flex-1 relative z-10 ml-64 p-8">
+      <div className="flex-1 relative z-10 pt-20 p-8">
         {/* Dashboard Header */}
         <div className="mb-8 p-4">
           <motion.h1
@@ -1510,7 +1366,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
             animate={{ opacity: 1, y: 0 }}
             whileHover={{ scale: 1.01, boxShadow: "0 20px 40px rgba(139,115,85,0.25)" }}
             transition={{ duration: 0.5, delay: 0.9 }}
-            onClick={() => onNavigate("my-cases")}
+            onClick={() => onNavigate("legal-researcher")}
             className="max-w-6xl mx-auto bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-[#d4b896]/50 cursor-pointer"
           >
             <div className="flex items-center gap-2 mb-4">
@@ -2369,11 +2225,11 @@ function LandingPage({ onMeetCustomers, onDashboard }: { onMeetCustomers: () => 
 
 
 // Settings Page Component
-function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
-      <Sidebar activePage="settings" onNavigate={onNavigate} />
-      <div className="flex-1 relative z-10 ml-64 p-8 flex items-center justify-center">
+      <TopNavbar activePage="settings" onNavigate={onNavigate} />
+      <div className="flex-1 relative z-10 pt-20 p-8 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-[32px] font-normal text-[#1a1a1a] mb-4" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Settings</h1>
           <p className="text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>User profile and preferences management coming soon.</p>
@@ -2384,7 +2240,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docume
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher">("dashboard");
+  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "settings" | "clients" | "legal-researcher">("dashboard");
 
   // Landing page doesn't need LanguageProvider
   if (currentPage === "landing") {
@@ -2401,8 +2257,8 @@ export default function App() {
     <LanguageProvider>
       {currentPage === "clients" && (
         <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
-          <Sidebar activePage="clients" onNavigate={(page) => setCurrentPage(page)} />
-          <div className="flex-1 relative z-10 ml-64 p-8">
+          <TopNavbar activePage="clients" onNavigate={(page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => setCurrentPage(page)} />
+          <div className="flex-1 relative z-10 pt-20 p-8">
             <ClientsPage />
           </div>
         </div>
@@ -2416,9 +2272,7 @@ export default function App() {
         <DocumentsPage onNavigate={(page) => setCurrentPage(page)} />
       )}
 
-      {currentPage === "my-cases" && (
-        <MyCasesPage onNavigate={(page) => setCurrentPage(page)} />
-      )}
+
 
       {currentPage === "settings" && (
         <SettingsPage onNavigate={(page) => setCurrentPage(page)} />
@@ -2426,8 +2280,8 @@ export default function App() {
 
       {currentPage === "legal-researcher" && (
         <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
-          <Sidebar activePage="legal-researcher" onNavigate={(page) => setCurrentPage(page)} />
-          <div className="flex-1 relative z-10 ml-64">
+          <TopNavbar activePage="legal-researcher" onNavigate={(page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => setCurrentPage(page)} />
+          <div className="flex-1 relative z-10 pt-20">
             <LegalResearcherPage />
           </div>
         </div>
