@@ -406,7 +406,7 @@ const ongoingCases = [
 
 const completedCases = [
   { id: "2024-0035", parties: "Patel vs State", verdict: "WON", details: "Acquitted", date: "Dec 20" },
-  { id: "2024-0031", parties: "Verma vs Corp", verdict: "SETTLED", details: "â‚¹5L", date: "Dec 18" },
+  { id: "2024-0031", parties: "Verma vs Corp", verdict: "SETTLED", details: "Rs.5L", date: "Dec 18" },
   { id: "2024-0028", parties: "Gupta vs Union", verdict: "LOST", details: "Dismissed", date: "Dec 15" },
   { id: "2024-0025", parties: "Reddy vs Bank", verdict: "WON", details: "Damages Awarded", date: "Dec 10" },
   { id: "2024-0021", parties: "Khan vs State", verdict: "WON", details: "Released", date: "Dec 05" },
@@ -599,7 +599,7 @@ function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documen
                   >
                     <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-green-500"></div>
                     <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Smith v. State of California</h5>
-                    <p className="text-[13px] text-[#666] mb-4">Found 12 citations â€¢ accessed 2h ago</p>
+                    <p className="text-[13px] text-[#666] mb-4">Found 12 citations | accessed 2h ago</p>
                     <div className="h-1.5 bg-[#e5e0d5] rounded-full overflow-hidden">
                       <div className="h-full bg-[#f97316] w-[65%] rounded-full"></div>
                     </div>
@@ -611,7 +611,7 @@ function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documen
                   >
                     <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-yellow-500"></div>
                     <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Patent Hearing: TechCorp</h5>
-                    <p className="text-[13px] text-[#666]">Audio Transcript â€¢ accessed 4h ago</p>
+                    <p className="text-[13px] text-[#666]">Audio Transcript | accessed 4h ago</p>
                   </motion.div>
                 </div>
 
@@ -626,7 +626,7 @@ function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documen
                   >
                     <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-green-500"></div>
                     <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Estate of J.R. Ewing</h5>
-                    <p className="text-[13px] text-[#666] mb-4">Probate â€¢ accessed 1d ago</p>
+                    <p className="text-[13px] text-[#666] mb-4">Probate | accessed 1d ago</p>
                     <div className="h-1.5 bg-[#e5e0d5] rounded-full overflow-hidden">
                       <div className="h-full bg-blue-600 w-[45%] rounded-full"></div>
                     </div>
@@ -644,7 +644,7 @@ function MyCasesPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documen
                   >
                     <div className="absolute right-3 top-3 w-2 h-2 rounded-full bg-blue-500"></div>
                     <h5 className="text-[16px] font-bold text-[#1a1a1a] mb-1" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>SolarTech Merger Acquisition</h5>
-                    <p className="text-[13px] text-[#666]">Due Diligence Review â€¢ accessed 4d ago</p>
+                    <p className="text-[13px] text-[#666]">Due Diligence Review | accessed 4d ago</p>
                   </motion.div>
                 </div>
 
@@ -750,9 +750,9 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       if (response.ok) {
         const data = await response.json();
         setMetadata(data.metadata);
-        setMessages(prev => [...prev, { role: "ai", content: "âœ… Document re-analyzed successfully! Summary and metadata updated." }]);
+        setMessages(prev => [...prev, { role: "ai", content: "[OK] Document re-analyzed successfully! Summary and metadata updated." }]);
       } else {
-        setMessages(prev => [...prev, { role: "ai", content: "âŒ Re-analysis failed. Please try again." }]);
+        setMessages(prev => [...prev, { role: "ai", content: "[X] Re-analysis failed. Please try again." }]);
       }
     } catch (error) {
       console.error("Re-analyze failed:", error);
@@ -812,7 +812,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
           // Set initial message if no chat history
           if (chatMessages.length === 0) {
             setMessages([
-              { role: "ai", content: `ðŸ“‹ **Loaded: ${doc.filename}**\n\nðŸ’¬ You can now ask questions about this document.` }
+              { role: "ai", content: `[DOC] **Loaded: ${doc.filename}**\n\n[CHAT] You can now ask questions about this document.` }
             ]);
           } else {
             setMessages(chatMessages);
@@ -864,7 +864,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       // Add initial analysis message - kept simple
       setMessages(prev => [...prev, {
         role: "ai",
-        content: `ðŸ“‹ **Document Analyzed: ${file.name}**\n\nðŸ’¬ You can now ask questions about this document.`
+        content: `[DOC] **Document Analyzed: ${file.name}**\n\n[CHAT] You can now ask questions about this document.`
       }]);
 
     } catch (error) {
@@ -1075,14 +1075,14 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
                         disabled={processing}
                         className="px-3 py-1.5 bg-[#f97316] text-white rounded text-xs font-medium hover:bg-[#ea580c] transition-colors disabled:opacity-50"
                       >
-                        {processing ? "Analyzing..." : "ðŸ”„ Re-Analyze"}
+                        {processing ? "Analyzing..." : " Re-Analyze"}
                       </button>
                       {metadata.detailed_summary && metadata.detailed_summary.length > 100 && (
                         <button
                           onClick={() => setShowFullSummary(true)}
                           className="px-3 py-1.5 bg-[#6b5744] text-white rounded text-xs font-medium hover:bg-[#5a4838] transition-colors"
                         >
-                          ðŸ“– Full Summary
+                           Full Summary
                         </button>
                       )}
                     </div>
@@ -1104,7 +1104,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <div className="bg-[#f5f1e8] rounded-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-serif italic text-[#1a1a1a]">Detailed Case Summary</h2>
-                  <button onClick={() => setShowFullSummary(false)} className="text-[#666] hover:text-[#1a1a1a]">âœ•</button>
+                  <button onClick={() => setShowFullSummary(false)} className="text-[#666] hover:text-[#1a1a1a]">x</button>
                 </div>
                 <div className="space-y-4">
                   <div>
@@ -1242,7 +1242,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
                       </div>
                       <div>
                         <p className="text-[14px] font-medium text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>{doc.filename || doc.case_title || "Untitled Document"}</p>
-                        <p className="text-[12px] text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>PDF â€¢ {doc.case_title ? doc.case_title.substring(0, 30) + "..." : "Legal Document"}</p>
+                        <p className="text-[12px] text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>PDF | {doc.case_title ? doc.case_title.substring(0, 30) + "..." : "Legal Document"}</p>
                       </div>
                     </div>
                     <span className="text-[12px] text-[#999]" style={{ fontFamily: "Montserrat, sans-serif" }}>{doc.upload_date ? new Date(doc.upload_date).toLocaleDateString() : "N/A"}</span>
@@ -1309,10 +1309,10 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 
   const getVerdictEmoji = (verdict: string) => {
     switch (verdict) {
-      case "WON": return "ðŸŸ¢";
-      case "LOST": return "ðŸ”´";
-      case "SETTLED": return "ðŸŸ¡";
-      default: return "âšª";
+      case "WON": return "W";
+      case "LOST": return "L";
+      case "SETTLED": return "S";
+      default: return "-";
     }
   };
 
@@ -1488,7 +1488,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <div className="space-y-2 max-h-[120px] overflow-y-auto">
                 {calendarEventsData.map((event: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 text-[13px]" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                    <span className={event.upcoming ? "text-[#f97316]" : "text-[#999]"}>{event.upcoming ? "â—" : "â—‹"}</span>
+                    <span className={event.upcoming ? "text-[#f97316]" : "text-[#999]"}>{event.upcoming ? ">" : "-"}</span>
                     <span className="text-[#666]">{event.date}</span>
                     <span className="text-[#1a1a1a]">{event.event} - Case {event.caseId}</span>
                   </div>
@@ -2353,7 +2353,7 @@ function LandingPage({ onMeetCustomers, onDashboard }: { onMeetCustomers: () => 
               className="text-[12px] text-[#666]"
               style={{ fontFamily: "Montserrat, sans-serif" }}
             >
-              Â© 2025 Sample AI. All Rights Reserved.
+              (c) 2025 Sample AI. All Rights Reserved.
             </p>
           </div>
         </div>
@@ -2425,6 +2425,7 @@ export default function App() {
 
   return <LandingPage onMeetCustomers={() => setCurrentPage("customers")} onDashboard={() => setCurrentPage("dashboard")} />;
 }
+
 
 
 
