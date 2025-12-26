@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
 from groq import Groq
 from database_manager import DatabaseManager
 from rate_limiter import RateLimiter
@@ -12,8 +14,14 @@ from guardrails import (
     build_messages_securely
 )
 
-# Get API key from environment or use default
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+# Load environment variables from .env file
+env_path = Path(__file__).parent / '.env'
+load_dotenv(env_path)
+
+# Get API key from environment (NO hardcoded fallback for security)
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise RuntimeError("GROQ_API_KEY not found in environment. Please set it in .env file.")
 
 logger = logging.getLogger(__name__)
 

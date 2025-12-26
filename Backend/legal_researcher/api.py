@@ -23,7 +23,7 @@ Usage:
     app.include_router(legal_router)
 """
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -387,16 +387,42 @@ async def list_user_cases(user_id: int):
 
 
 @router.get("/cases/{case_id}", response_model=CaseResponse)
-async def get_case(case_id: int, user_id: int):
+async def get_case(case_id: int, user_id: int, request: Request):
     """
     Get detailed information for a specific case.
     Verifies user ownership before returning data.
+    Logs access for audit trail.
     """
     db = get_db_manager()
     case = db.get_case(case_id, user_id)
     
+    # Log the access attempt
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
     if not case:
+        # Log failed access attempt
+        db.log_audit(
+            action="VIEW_CASE_DENIED",
+            user_id=user_id,
+            resource_type="case",
+            resource_id=case_id,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            status="denied"
+        )
         raise HTTPException(status_code=404, detail="Case not found or access denied")
+    
+    # Log successful access
+    db.log_audit(
+        action="VIEW_CASE",
+        user_id=user_id,
+        resource_type="case",
+        resource_id=case_id,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        details=f"Viewed case: {case['client_name']}"
+    )
     
     docs = db.get_case_documents(case_id)
     
@@ -414,13 +440,39 @@ async def get_case(case_id: int, user_id: int):
 
 
 @router.delete("/cases/{case_id}")
-async def delete_case(case_id: int, user_id: int):
+async def delete_case(case_id: int, user_id: int, request: Request):
     """
     Delete a case (only if owned by user).
+    Logs deletion for audit trail.
     """
-    success = get_db_manager().delete_case(case_id, user_id)
+    db = get_db_manager()
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    success = db.delete_case(case_id, user_id)
     if success:
+        # Log successful deletion
+        db.log_audit(
+            action="DELETE_CASE",
+            user_id=user_id,
+            resource_type="case",
+            resource_id=case_id,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            details=f"Deleted case #{case_id}"
+        )
         return {"success": True, "message": f"Case #{case_id} deleted"}
+    
+    # Log failed deletion attempt
+    db.log_audit(
+        action="DELETE_CASE_DENIED",
+        user_id=user_id,
+        resource_type="case",
+        resource_id=case_id,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        status="denied"
+    )
     raise HTTPException(status_code=404, detail="Case not found or access denied")
 
 
@@ -510,15 +562,28 @@ async def get_case_summary(case_id: int):
 # ==================== PDF EXPORT ENDPOINT ====================
 
 @router.get("/export/{case_id}")
-async def export_case_pdf(case_id: int, user_id: int):
+async def export_case_pdf(case_id: int, user_id: int, request: Request):
     """
     Export a case to PDF format.
     Returns the PDF file for download.
+    Logs export for audit trail.
     """
     # Verify ownership
     db = get_db_manager()
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
     case = db.get_case(case_id, user_id)
     if not case:
+        db.log_audit(
+            action="EXPORT_PDF_DENIED",
+            user_id=user_id,
+            resource_type="case",
+            resource_id=case_id,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            status="denied"
+        )
         raise HTTPException(status_code=404, detail="Case not found or access denied")
     
     # Generate PDF
@@ -526,6 +591,17 @@ async def export_case_pdf(case_id: int, user_id: int):
     
     if not filename or not os.path.exists(filename):
         raise HTTPException(status_code=500, detail="Failed to generate PDF")
+    
+    # Log successful export
+    db.log_audit(
+        action="EXPORT_PDF",
+        user_id=user_id,
+        resource_type="case",
+        resource_id=case_id,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        details=f"Exported PDF: {os.path.basename(filename)}"
+    )
     
     return FileResponse(
         path=filename,
@@ -653,6 +729,76 @@ async def get_user_stats(user_id: int):
         "queries_asked": total_chats,
         "time_saved_hours": time_saved_hours,
         "time_saved_minutes": time_saved_minutes
+    }
+
+
+# ==================== AUDIT LOGS ENDPOINTS ====================
+
+@router.get("/audit/logs")
+async def get_audit_logs(
+    user_id: Optional[int] = None,
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    limit: int = 100
+):
+    """
+    Retrieve audit logs with optional filters.
+    For compliance and security tracking.
+    
+    Filter options:
+    - user_id: Show logs for specific user
+    - action: Filter by action type (VIEW_CASE, DELETE_CASE, EXPORT_PDF, etc.)
+    - resource_type: Filter by resource (case, document, client)
+    """
+    db = get_db_manager()
+    logs = db.get_audit_logs(
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+        limit=limit
+    )
+    
+    return {
+        "total": len(logs),
+        "logs": [
+            {
+                "log_id": log['log_id'],
+                "timestamp": str(log['timestamp']),
+                "user_id": log['user_id'],
+                "action": log['action'],
+                "resource_type": log['resource_type'],
+                "resource_id": log['resource_id'],
+                "ip_address": log['ip_address'],
+                "status": log['status'],
+                "details": log['details']
+            }
+            for log in logs
+        ]
+    }
+
+
+@router.get("/audit/resource/{resource_type}/{resource_id}")
+async def get_resource_audit_history(resource_type: str, resource_id: int, limit: int = 50):
+    """
+    Get access history for a specific resource.
+    Useful for seeing who viewed a particular case.
+    """
+    db = get_db_manager()
+    logs = db.get_resource_access_history(resource_type, resource_id, limit)
+    
+    return {
+        "resource_type": resource_type,
+        "resource_id": resource_id,
+        "access_history": [
+            {
+                "timestamp": str(log['timestamp']),
+                "user_id": log['user_id'],
+                "action": log['action'],
+                "ip_address": log['ip_address'],
+                "status": log['status']
+            }
+            for log in logs
+        ]
     }
 
 

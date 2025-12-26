@@ -77,6 +77,23 @@ class DatabaseManager:
                     FOREIGN KEY(case_id) REFERENCES cases(case_id)
                 )
             """)
+            
+            # Table 5: Audit Logs (Security & Compliance)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    user_id INTEGER,
+                    action TEXT NOT NULL,
+                    resource_type TEXT,
+                    resource_id INTEGER,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    details TEXT,
+                    status TEXT DEFAULT 'success',
+                    FOREIGN KEY(user_id) REFERENCES users(user_id)
+                )
+            """)
             conn.commit()
             
             # Migration: Add progress and stage columns if they don't exist
@@ -249,3 +266,97 @@ class DatabaseManager:
         """Clear all chat history for a case."""
         with self.connect() as conn:
             conn.execute("DELETE FROM chat_logs WHERE case_id = ?", (case_id,))
+
+    # ==================== AUDIT LOGGING METHODS ====================
+    
+    def log_audit(
+        self, 
+        action: str, 
+        user_id: int = None, 
+        resource_type: str = None,
+        resource_id: int = None, 
+        ip_address: str = None,
+        user_agent: str = None,
+        details: str = None,
+        status: str = "success"
+    ):
+        """
+        Log an audit event for compliance and security tracking.
+        
+        Actions include:
+        - VIEW_CASE, EXPORT_PDF, DELETE_CLIENT, CREATE_CASE
+        - LOGIN, LOGOUT, FAILED_LOGIN
+        - UPLOAD_DOCUMENT, DELETE_DOCUMENT
+        - CHAT_MESSAGE, UPDATE_CASE
+        """
+        with self.connect() as conn:
+            conn.execute("""
+                INSERT INTO audit_logs 
+                (user_id, action, resource_type, resource_id, ip_address, user_agent, details, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, action, resource_type, resource_id, ip_address, user_agent, details, status))
+    
+    def get_audit_logs(
+        self, 
+        user_id: int = None, 
+        action: str = None,
+        resource_type: str = None,
+        limit: int = 100,
+        since: str = None
+    ) -> List:
+        """
+        Retrieve audit logs with optional filters.
+        
+        Args:
+            user_id: Filter by specific user
+            action: Filter by action type
+            resource_type: Filter by resource (case, document, client)
+            limit: Maximum records to return
+            since: ISO timestamp to filter logs after this time
+        """
+        with self.connect() as conn:
+            query = "SELECT * FROM audit_logs WHERE 1=1"
+            params = []
+            
+            if user_id:
+                query += " AND user_id = ?"
+                params.append(user_id)
+            if action:
+                query += " AND action = ?"
+                params.append(action)
+            if resource_type:
+                query += " AND resource_type = ?"
+                params.append(resource_type)
+            if since:
+                query += " AND timestamp >= ?"
+                params.append(since)
+            
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor = conn.execute(query, params)
+            return cursor.fetchall()
+    
+    def get_user_activity(self, user_id: int, limit: int = 50) -> List:
+        """Get recent activity for a specific user."""
+        with self.connect() as conn:
+            cursor = conn.execute("""
+                SELECT timestamp, action, resource_type, resource_id, ip_address, status 
+                FROM audit_logs 
+                WHERE user_id = ? 
+                ORDER BY timestamp DESC 
+                LIMIT ?
+            """, (user_id, limit))
+            return cursor.fetchall()
+    
+    def get_resource_access_history(self, resource_type: str, resource_id: int, limit: int = 50) -> List:
+        """Get access history for a specific resource (who viewed a case, etc.)."""
+        with self.connect() as conn:
+            cursor = conn.execute("""
+                SELECT timestamp, user_id, action, ip_address, status, details
+                FROM audit_logs 
+                WHERE resource_type = ? AND resource_id = ?
+                ORDER BY timestamp DESC 
+                LIMIT ?
+            """, (resource_type, resource_id, limit))
+            return cursor.fetchall()
