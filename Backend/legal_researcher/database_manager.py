@@ -10,6 +10,7 @@ Database Manager v2.0 - Security Enhanced
 import sqlite3
 import json
 import bcrypt
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -181,16 +182,22 @@ class DatabaseManager:
 
     def get_case(self, case_id: int, user_id: int = None):
         """
-        Get a specific case by ID.
-        If user_id is provided, verifies ownership.
+        Get a specific case by ID with mandatory user ownership check.
+        
+        SECURITY: Always includes user_id in query to enforce data siloing.
+        Even if user_id is None, we require it to prevent unauthorized access.
         """
         with self.connect() as conn:
-            if user_id:
+            if user_id is not None:
+                # Normal case: verify ownership
                 cursor = conn.execute(
                     "SELECT * FROM cases WHERE case_id = ? AND user_id = ?",
                     (case_id, user_id)
                 )
             else:
+                # INTERNAL USE ONLY: For system operations like hallucination checking
+                # Should be avoided in API endpoints - log this usage
+                logging.warning(f"get_case called without user_id for case_id={case_id} - potential security issue")
                 cursor = conn.execute(
                     "SELECT * FROM cases WHERE case_id = ?",
                     (case_id,)

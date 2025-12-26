@@ -46,6 +46,15 @@ from case_generator import CaseGenerator
 from secure_chat import SecureChatbot
 from legal_researcher import LegalResearcher, ClientDB, FIRECRAWL_API_KEY
 from translation import translate_to_english, translate_from_english, get_supported_languages
+from jwt_auth import (
+    create_access_token, 
+    verify_password, 
+    hash_password,
+    get_current_user, 
+    get_user_id,
+    UserCredentials,
+    AuthResponse
+)
 
 # Get API key from environment
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
@@ -228,6 +237,144 @@ async def get_user_info(user_id: int):
     if username != "Unknown":
         return {"user_id": user_id, "username": username}
     raise HTTPException(status_code=404, detail="User not found")
+
+
+# ==================== JWT AUTHENTICATION ENDPOINTS ====================
+
+@router.post("/auth/register", response_model=AuthResponse)
+async def register_user(credentials: UserCredentials, request: Request):
+    """
+    Register a new user with JWT authentication.
+    
+    Pydantic UserCredentials model prevents mass assignment attacks
+    by only accepting username and password fields.
+    """
+    db = get_db_manager()
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Check if user already exists
+    existing = db.login_user(credentials.username, "dummy")  # Will fail but checks existence
+    if existing is not True and existing is not False:
+        # User exists, log and reject
+        db.log_audit(
+            action="REGISTER_FAILED",
+            resource_type="auth",
+            ip_address=client_ip,
+            details=f"Username already exists: {credentials.username}",
+            status="denied"
+        )
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Register the user
+    success = db.register_user(credentials.username, credentials.password)
+    if not success:
+        raise HTTPException(status_code=400, detail="Registration failed - username may already exist")
+    
+    # Login to get user_id and create token
+    user = db.login_user(credentials.username, credentials.password)
+    if not user:
+        raise HTTPException(status_code=500, detail="Registration succeeded but login failed")
+    
+    user_id = user['user_id']
+    token, expires_in = create_access_token(user_id, credentials.username)
+    
+    # Log successful registration
+    db.log_audit(
+        action="USER_REGISTERED",
+        user_id=user_id,
+        resource_type="auth",
+        ip_address=client_ip,
+        details=f"New user registered: {credentials.username}"
+    )
+    
+    return AuthResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user_id=user_id,
+        username=credentials.username
+    )
+
+
+@router.post("/auth/login", response_model=AuthResponse)
+async def login_user(credentials: UserCredentials, request: Request):
+    """
+    Login with username/password and receive a JWT token.
+    
+    The token should be sent in subsequent requests as:
+    Authorization: Bearer <token>
+    """
+    db = get_db_manager()
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+    
+    user = db.login_user(credentials.username, credentials.password)
+    
+    if not user:
+        # Log failed login attempt
+        db.log_audit(
+            action="LOGIN_FAILED",
+            resource_type="auth",
+            ip_address=client_ip,
+            user_agent=user_agent,
+            details=f"Failed login attempt for: {credentials.username}",
+            status="denied"
+        )
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    user_id = user['user_id']
+    token, expires_in = create_access_token(user_id, credentials.username)
+    
+    # Log successful login
+    db.log_audit(
+        action="USER_LOGIN",
+        user_id=user_id,
+        resource_type="auth",
+        ip_address=client_ip,
+        user_agent=user_agent,
+        details=f"User logged in: {credentials.username}"
+    )
+    
+    return AuthResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user_id=user_id,
+        username=credentials.username
+    )
+
+
+@router.get("/auth/me")
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """
+    Get information about the currently authenticated user.
+    
+    Requires valid JWT token in Authorization header.
+    This endpoint demonstrates the get_current_user dependency.
+    """
+    return {
+        "user_id": current_user["user_id"],
+        "username": current_user["username"],
+        "authenticated": True
+    }
+
+
+@router.post("/auth/refresh", response_model=AuthResponse)
+async def refresh_token(current_user: dict = Depends(get_current_user)):
+    """
+    Refresh an existing JWT token before it expires.
+    
+    Requires valid JWT token in Authorization header.
+    """
+    user_id = current_user["user_id"]
+    username = current_user["username"]
+    
+    token, expires_in = create_access_token(user_id, username)
+    
+    return AuthResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user_id=user_id,
+        username=username
+    )
 
 
 # ==================== CASE MANAGEMENT ENDPOINTS ====================
