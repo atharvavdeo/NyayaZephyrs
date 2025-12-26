@@ -47,6 +47,8 @@ class DatabaseManager:
                     client_name TEXT,
                     raw_description TEXT,
                     structured_data TEXT,
+                    progress INTEGER DEFAULT 0,
+                    stage TEXT DEFAULT '',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(user_id) REFERENCES users(user_id)
                 )
@@ -75,6 +77,17 @@ class DatabaseManager:
                     FOREIGN KEY(case_id) REFERENCES cases(case_id)
                 )
             """)
+            conn.commit()
+            
+            # Migration: Add progress and stage columns if they don't exist
+            try:
+                cursor.execute("ALTER TABLE cases ADD COLUMN progress INTEGER DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            try:
+                cursor.execute("ALTER TABLE cases ADD COLUMN stage TEXT DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
             conn.commit()
 
     # ==================== AUTH METHODS ====================
@@ -173,6 +186,23 @@ class DatabaseManager:
             cursor = conn.execute(
                 "DELETE FROM cases WHERE case_id = ? AND user_id = ?",
                 (case_id, user_id)
+            )
+            return cursor.rowcount > 0
+
+    def update_case_progress(self, case_id: int, user_id: int, progress: int, stage: str) -> bool:
+        """
+        Update progress and stage for a case.
+        Progress: 0-100 integer
+        Stage: text like 'filing', 'trial', 'appeal', 'complete'
+        Returns True if updated successfully.
+        """
+        # Clamp progress to 0-100
+        progress = max(0, min(100, progress))
+        
+        with self.connect() as conn:
+            cursor = conn.execute(
+                "UPDATE cases SET progress = ?, stage = ? WHERE case_id = ? AND user_id = ?",
+                (progress, stage, case_id, user_id)
             )
             return cursor.rowcount > 0
 

@@ -61,6 +61,9 @@ export interface BackendCase {
   raw_description?: string;
   created_at: string;
   documents?: Array<{ filename: string; chars: number }>;
+  progress: number;
+  stage: string;
+  is_complete: boolean;
 }
 
 // Flattened case for UI
@@ -77,6 +80,24 @@ export interface CaseDetails {
   raw_description: string;
   created_at: string;
   documents: Array<{ filename: string; chars: number }>;
+  progress: number;
+  stage: string;
+  is_complete: boolean;
+}
+
+// Progress update request
+export interface ProgressUpdateRequest {
+  user_id: number;
+  progress: number;
+  stage: string;
+}
+
+export interface ProgressUpdateResponse {
+  success: boolean;
+  message: string;
+  progress: number;
+  stage: string;
+  is_complete: boolean;
 }
 
 // Convert backend case to flattened UI case
@@ -95,7 +116,26 @@ function flattenCase(backendCase: BackendCase): CaseDetails {
     raw_description: backendCase.raw_description || "",
     created_at: backendCase.created_at,
     documents: backendCase.documents || [],
+    progress: backendCase.progress || 0,
+    stage: backendCase.stage || "",
+    is_complete: backendCase.is_complete || false,
   };
+}
+
+// Update case progress and stage
+export async function updateCaseProgress(
+  caseId: number,
+  data: ProgressUpdateRequest
+): Promise<ProgressUpdateResponse> {
+  const response = await fetch(`${API_BASE}/cases/${caseId}/progress`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update progress: ${response.statusText}`);
+  }
+  return response.json();
 }
 
 export interface CaseCreateManual {

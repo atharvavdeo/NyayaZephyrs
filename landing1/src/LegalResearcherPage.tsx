@@ -14,6 +14,7 @@ import {
   conductResearch,
   exportCasePDF,
   getUserStats,
+  updateCaseProgress,
   type CaseDetails,
   type ChatMessage,
   type ResearchResult,
@@ -374,6 +375,12 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
   const [researching, setResearching] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Progress tracking state
+  const [progress, setProgress] = useState(caseData.progress || 0);
+  const [stage, setStage] = useState(caseData.stage || "");
+  const [savingProgress, setSavingProgress] = useState(false);
+  const [progressSaved, setProgressSaved] = useState(false);
+
   useEffect(() => {
     loadChatHistory();
     loadSummary();
@@ -462,6 +469,24 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
     }
   };
 
+  const handleSaveProgress = async () => {
+    setSavingProgress(true);
+    setProgressSaved(false);
+    try {
+      await updateCaseProgress(caseData.case_id, {
+        user_id: DEFAULT_USER_ID,
+        progress,
+        stage,
+      });
+      setProgressSaved(true);
+      setTimeout(() => setProgressSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save progress", err);
+    } finally {
+      setSavingProgress(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -524,6 +549,67 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
             <div className="flex justify-between">
               <span className="text-[#666]">Created</span>
               <span className="font-medium text-[#1a1a1a]">{new Date(caseData.created_at).toLocaleDateString()}</span>
+            </div>
+
+            {/* Progress Section */}
+            <hr className="border-[#d4b896]/50" />
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[#666]">Progress</span>
+                {stage.toLowerCase() === 'complete' && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">✓ Complete</span>
+                )}
+              </div>
+
+              {/* Progress Slider */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-[#666]">
+                  <span>0%</span>
+                  <span className="font-medium text-[#f97316]">{progress}%</span>
+                  <span>100%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="10"
+                  value={progress}
+                  onChange={(e) => setProgress(parseInt(e.target.value))}
+                  className="w-full h-2 bg-[#e5ddd0] rounded-lg appearance-none cursor-pointer accent-[#f97316]"
+                />
+                <div className="h-2 bg-[#e5ddd0] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#f97316] to-[#ea580c] rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Stage Input */}
+              <div className="space-y-1">
+                <span className="text-[#666] text-xs">Stage (filing / trial / appeal / complete)</span>
+                <input
+                  type="text"
+                  value={stage}
+                  onChange={(e) => setStage(e.target.value)}
+                  placeholder="e.g. filing, trial, appeal, complete"
+                  className="w-full px-3 py-2 bg-white/50 border border-[#d4b896] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#f97316]/50"
+                />
+              </div>
+
+              {/* Save Button */}
+              <button
+                onClick={handleSaveProgress}
+                disabled={savingProgress}
+                className={`w-full py-2 rounded-lg text-sm font-medium transition-all ${progressSaved
+                    ? "bg-green-500 text-white"
+                    : savingProgress
+                      ? "bg-[#d4c4a8] text-[#666] cursor-wait"
+                      : "bg-[#f97316] text-white hover:bg-[#ea580c]"
+                  }`}
+              >
+                {progressSaved ? "✓ Saved!" : savingProgress ? "Saving..." : "Save Progress"}
+              </button>
             </div>
 
             {caseData.legal_issue_summary && (

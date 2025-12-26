@@ -134,10 +134,19 @@ class CaseResponse(BaseModel):
     raw_description: Optional[str] = None
     created_at: str
     documents: Optional[List[Dict]] = []
+    progress: int = 0
+    stage: str = ""
+    is_complete: bool = False
 
 class CaseListResponse(BaseModel):
     cases: List[CaseResponse]
     total: int
+
+class ProgressUpdateRequest(BaseModel):
+    """Request model for updating case progress"""
+    user_id: int
+    progress: int = Field(..., ge=0, le=100, description="Progress percentage 0-100")
+    stage: str = Field(..., description="Current stage: filing, trial, appeal, complete, etc.")
 
 # --- Chat Models ---
 class ChatRequest(BaseModel):
@@ -368,7 +377,10 @@ async def list_user_cases(user_id: int):
             structured_data=json.loads(case['structured_data']),
             raw_description=case['raw_description'],
             created_at=str(case['created_at']),
-            documents=[{"filename": d['filename'], "chars": len(d['parsed_text'])} for d in docs]
+            documents=[{"filename": d['filename'], "chars": len(d['parsed_text'])} for d in docs],
+            progress=case['progress'] if 'progress' in case.keys() else 0,
+            stage=case['stage'] if 'stage' in case.keys() else "",
+            is_complete=(case['stage'].lower() == 'complete') if 'stage' in case.keys() and case['stage'] else False
         ))
     
     return CaseListResponse(cases=case_list, total=len(case_list))
@@ -394,7 +406,10 @@ async def get_case(case_id: int, user_id: int):
         structured_data=json.loads(case['structured_data']),
         raw_description=case['raw_description'],
         created_at=str(case['created_at']),
-        documents=[{"filename": d['filename'], "chars": len(d['parsed_text'])} for d in docs]
+        documents=[{"filename": d['filename'], "chars": len(d['parsed_text'])} for d in docs],
+        progress=case['progress'] if 'progress' in case.keys() else 0,
+        stage=case['stage'] if 'stage' in case.keys() else "",
+        is_complete=(case['stage'].lower() == 'complete') if 'stage' in case.keys() and case['stage'] else False
     )
 
 
@@ -406,6 +421,27 @@ async def delete_case(case_id: int, user_id: int):
     success = get_db_manager().delete_case(case_id, user_id)
     if success:
         return {"success": True, "message": f"Case #{case_id} deleted"}
+    raise HTTPException(status_code=404, detail="Case not found or access denied")
+
+
+@router.put("/cases/{case_id}/progress")
+async def update_case_progress(case_id: int, request: ProgressUpdateRequest):
+    """
+    Update progress and stage for a case.
+    Sets is_complete to True when stage is 'complete'.
+    """
+    db = get_db_manager()
+    success = db.update_case_progress(case_id, request.user_id, request.progress, request.stage)
+    
+    if success:
+        is_complete = request.stage.lower() == 'complete'
+        return {
+            "success": True,
+            "message": f"Case #{case_id} progress updated",
+            "progress": request.progress,
+            "stage": request.stage,
+            "is_complete": is_complete
+        }
     raise HTTPException(status_code=404, detail="Case not found or access denied")
 
 
