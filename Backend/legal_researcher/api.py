@@ -626,7 +626,7 @@ async def get_research_history(client_name: str):
 @router.get("/stats/{user_id}")
 async def get_user_stats(user_id: int):
     """
-    Get statistics for a user: total cases, total chats, etc.
+    Get statistics for a user: total cases, total chats, time saved, etc.
     """
     db = get_db_manager()
     cases = db.get_user_cases(user_id)
@@ -641,11 +641,18 @@ async def get_user_stats(user_id: int):
         history = db.get_chat_history(case['case_id'], limit=1000)
         total_chats += len(history)
     
+    # Estimate time saved: ~5 min per document + ~2 min per chat query
+    total_minutes_saved = (total_docs * 5) + (total_chats * 2) + (len(cases) * 10)
+    time_saved_hours = total_minutes_saved // 60
+    time_saved_minutes = total_minutes_saved % 60
+    
     return {
         "user_id": user_id,
         "total_cases": len(cases),
-        "total_documents": total_docs,
-        "total_chat_messages": total_chats
+        "documents_analyzed": total_docs,
+        "queries_asked": total_chats,
+        "time_saved_hours": time_saved_hours,
+        "time_saved_minutes": time_saved_minutes
     }
 
 

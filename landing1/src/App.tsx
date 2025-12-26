@@ -398,14 +398,6 @@ function CustomersPage() {
   );
 }
 
-// Sample data for Dashboard (only calendar events are still static)
-const calendarEvents = [
-  { date: "Dec 26", event: "Hearing", caseId: "#42", upcoming: true },
-  { date: "Dec 28", event: "Filing", caseId: "#38", upcoming: false },
-  { date: "Jan 02", event: "Hearing", caseId: "#45", upcoming: false },
-  { date: "Jan 05", event: "Review", caseId: "#42", upcoming: false },
-];
-
 // Top Navbar Component (replaces Sidebar)
 function TopNavbar({ activePage, onNavigate }: { activePage: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher"; onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1175,7 +1167,18 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     documents: dashboardStats.documents_analyzed,
     accuracy: 94.2
   };
-  const calendarEventsData = calendarEvents;
+  // Generate calendar events from cases
+  const calendarEventsData = cases.slice(0, 4).map((c, idx) => {
+    const stages = ['Filing', 'Hearing', 'Review', 'Trial'];
+    const baseDate = new Date(c.created_at || Date.now());
+    baseDate.setDate(baseDate.getDate() + (idx + 1) * 3); // Stagger by 3 days each
+    return {
+      date: baseDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      event: stages[idx % stages.length],
+      caseId: `#${c.case_id}`,
+      upcoming: idx === 0
+    };
+  });
 
   // Filter cases by completion status
   const ongoingCasesData = cases.filter(c => !c.is_complete).slice(0, 5).map(c => ({

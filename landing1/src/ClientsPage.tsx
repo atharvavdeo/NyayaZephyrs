@@ -391,28 +391,53 @@ export default function ClientsPage() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {clients.map((client) => (
-                                <div
-                                    key={client.id}
-                                    onClick={() => handleClientClick(client.id)}
-                                    className="bg-[#f5e6c8]/50 backdrop-blur-sm border border-[#d4b896] rounded-xl p-6 cursor-pointer hover:shadow-xl hover:bg-[#f5e6c8] transition-all duration-200 group"
-                                >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="w-12 h-12 bg-[#d4b896]/30 rounded-full flex items-center justify-center text-xl font-serif font-bold text-[#6b5744]">
-                                            {client.name.charAt(0)}
+                            {clients.map((client, idx) => {
+                                // Multi-colored theme palette
+                                const colorSchemes = [
+                                    { bg: 'from-[#fef3e2] to-[#fde8d0]', accent: '#f97316', avatarBg: 'bg-orange-100', avatarText: 'text-orange-700' },
+                                    { bg: 'from-[#e8f5e9] to-[#c8e6c9]', accent: '#22c55e', avatarBg: 'bg-green-100', avatarText: 'text-green-700' },
+                                    { bg: 'from-[#e3f2fd] to-[#bbdefb]', accent: '#3b82f6', avatarBg: 'bg-blue-100', avatarText: 'text-blue-700' },
+                                    { bg: 'from-[#fce4ec] to-[#f8bbd9]', accent: '#ec4899', avatarBg: 'bg-pink-100', avatarText: 'text-pink-700' },
+                                    { bg: 'from-[#f3e5f5] to-[#e1bee7]', accent: '#a855f7', avatarBg: 'bg-purple-100', avatarText: 'text-purple-700' },
+                                    { bg: 'from-[#fff8e1] to-[#ffecb3]', accent: '#eab308', avatarBg: 'bg-yellow-100', avatarText: 'text-yellow-700' },
+                                ];
+                                const scheme = colorSchemes[idx % colorSchemes.length];
+
+                                return (
+                                    <motion.div
+                                        key={client.id}
+                                        whileHover={{ scale: 1.02, y: -4 }}
+                                        onClick={() => handleClientClick(client.id)}
+                                        className={`bg-gradient-to-br ${scheme.bg} backdrop-blur-sm border-2 border-[#d4b896]/50 rounded-2xl p-6 cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 group relative overflow-hidden`}
+                                    >
+                                        {/* Decorative accent stripe */}
+                                        <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ backgroundColor: scheme.accent }} />
+
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className={`w-14 h-14 ${scheme.avatarBg} rounded-xl flex items-center justify-center text-2xl font-serif font-bold ${scheme.avatarText} shadow-sm`}>
+                                                {client.name.charAt(0)}
+                                            </div>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm ${client.status === 'Active'
+                                                    ? 'bg-green-500 text-white'
+                                                    : 'bg-gray-500 text-white'
+                                                }`}>
+                                                {client.status}
+                                            </span>
                                         </div>
-                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide ${client.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                            {client.status}
-                                        </span>
-                                    </div>
-                                    <h3 className="text-xl font-serif font-bold text-[#1a1a1a] mb-1 group-hover:text-[#f97316] transition-colors">{client.name}</h3>
-                                    <p className="text-sm text-[#666] mb-4">{client.email || "No email"}</p>
-                                    <div className="pt-4 border-t border-[#d4b896]/30 flex justify-between items-center text-xs text-[#8b7355]">
-                                        <span>View Profile</span>
-                                        <span>→</span>
-                                    </div>
-                                </div>
-                            ))}
+                                        <h3 className="text-xl font-serif font-bold text-[#1a1a1a] mb-1 group-hover:text-[#f97316] transition-colors">{client.name}</h3>
+                                        <p className="text-sm text-[#666] mb-4">{client.email || "Case #" + client.id}</p>
+                                        <div className="pt-4 border-t border-[#d4b896]/40 flex justify-between items-center">
+                                            <span className="text-xs font-semibold text-[#8b7355] flex items-center gap-1">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                View Case File
+                                            </span>
+                                            <span className="text-lg group-hover:translate-x-1 transition-transform" style={{ color: scheme.accent }}>→</span>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     </motion.div>
                 ) : (
