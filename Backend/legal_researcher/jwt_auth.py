@@ -1,4 +1,8 @@
 """
+This module handles secure authentication. It provides functionality for password hashing (bcrypt), JWT token generation, verification, and dependency injection for protecting API routes.
+"""
+
+"""
 JWT Authentication Module for Legal Researcher API
 ===================================================
 Provides secure, stateless authentication using JSON Web Tokens.
@@ -21,16 +25,16 @@ from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-# Load environment variables
+                            
 env_path = Path(__file__).parent / '.env'
 load_dotenv(env_path)
 
-# JWT Configuration
+                   
 JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
 
-# Security bearer for token extraction
+                                      
 security = HTTPBearer()
 
 
@@ -122,7 +126,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     token = credentials.credentials
     payload = decode_token(token)
     
-    # Validate payload structure
+                                
     if "user_id" not in payload or "username" not in payload:
         raise HTTPException(status_code=401, detail="Invalid token payload")
     
@@ -145,7 +149,7 @@ def get_user_id(current_user: dict = Depends(get_current_user)) -> int:
     return current_user["user_id"]
 
 
-# Optional authentication - returns None if no token provided
+                                                             
 class OptionalHTTPBearer(HTTPBearer):
     """Optional bearer token - doesn't raise error if missing."""
     async def __call__(self, request) -> Optional[HTTPAuthorizationCredentials]:

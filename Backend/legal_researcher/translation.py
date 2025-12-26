@@ -1,4 +1,8 @@
 """
+This module provides multilingual support, enabling the translation of user queries and AI responses between English and supported Indian languages.
+"""
+
+"""
 Translation Middleware for Legal Researcher
 ============================================
 Provides translation utilities for multilingual support.
@@ -15,7 +19,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Supported languages with their codes
+                                      
 SUPPORTED_LANGUAGES = {
     'en': 'English',
     'es': 'Spanish',
@@ -60,7 +64,7 @@ def translate_text(text: str, source_lang: str = 'auto', target_lang: str = 'en'
     if not text or not text.strip():
         return text
     
-    # No translation needed if same language
+                                            
     if source_lang == target_lang:
         return text
     
@@ -122,13 +126,13 @@ def process_multilingual_chat(user_text: str, target_lang: str, rag_function) ->
     Returns:
         Response in user's language
     """
-    # Step 1: Translate input to English for RAG
+                                                
     english_query = translate_to_english(user_text, source_lang=target_lang)
     
-    # Step 2: Run RAG logic (expects English input)
+                                                   
     english_response = rag_function(english_query)
     
-    # Step 3: Translate response back to user's language
+                                                        
     final_response = translate_from_english(english_response, target_lang)
     
     return final_response

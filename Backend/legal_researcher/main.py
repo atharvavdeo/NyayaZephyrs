@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+"""
+This is the application entry point. It initializes the FastAPI app, configures CORS, and includes the API router.
+"""
+
+                      
 """
 LEGAL CASE MANAGEMENT SYSTEM v2.0 - Terminal Edition
 =====================================================
@@ -19,7 +23,7 @@ from database_manager import DatabaseManager
 from case_generator import CaseGenerator
 from secure_chat import SecureChatbot
 
-# CONFIG
+        
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 
 
@@ -58,7 +62,7 @@ def authenticate(db: DatabaseManager) -> tuple:
         choice = input("\nSelect Option: ").strip()
         
         if choice == '1':
-            # LOGIN
+                   
             print("\n--- LOGIN ---")
             username = input("Username: ").strip()
             password = getpass.getpass("Password: ")
@@ -71,7 +75,7 @@ def authenticate(db: DatabaseManager) -> tuple:
                 print("\n❌ Invalid credentials. Try again.")
         
         elif choice == '2':
-            # REGISTER
+                      
             print("\n--- REGISTER ---")
             username = input("Choose Username: ").strip()
             password = getpass.getpass("Choose Password: ")
@@ -170,7 +174,7 @@ def new_case_pdf(db: DatabaseManager, generator: CaseGenerator, user_id: int):
     
     pdf_path = input("Enter PDF file path: ").strip()
     
-    # Handle drag-and-drop paths with quotes
+                                            
     pdf_path = pdf_path.strip("'\"")
     
     if not os.path.exists(pdf_path):
@@ -208,10 +212,10 @@ def new_case_pdf(db: DatabaseManager, generator: CaseGenerator, user_id: int):
         client_name = structured_data.get('client_name', 'PDF Upload')
         filename = os.path.basename(pdf_path)
         
-        # Save case
+                   
         case_id = db.save_case(user_id, client_name, structured_data, f"[PDF: {filename}]")
         
-        # Save document text
+                            
         db.save_document(case_id, filename, full_text)
         
         print(f"\n✅ Case #{case_id} created from PDF!")
@@ -245,7 +249,7 @@ def view_my_cases(db: DatabaseManager, user_id: int):
     
     print("-" * 50)
     
-    # Detailed view option
+                          
     case_id = input("\nEnter Case ID to view details (or Enter to skip): ").strip()
     if case_id:
         try:
@@ -261,7 +265,7 @@ def view_my_cases(db: DatabaseManager, user_id: int):
                         value = ", ".join(str(v) for v in value)
                     print(f"• {formatted_key}: {value}")
                 
-                # Show attached docs
+                                    
                 docs = db.get_case_documents(case['case_id'])
                 if docs:
                     print(f"\n📎 Attached Documents:")
@@ -277,7 +281,7 @@ def chat_with_case(db: DatabaseManager, bot: SecureChatbot, user_id: int):
     """Interactive chat with a specific case."""
     print_header("💬 CHAT WITH CASE")
     
-    # List cases first
+                      
     cases = db.get_user_cases(user_id)
     if not cases:
         print("No cases found. Create one first.")
@@ -300,7 +304,7 @@ def chat_with_case(db: DatabaseManager, bot: SecureChatbot, user_id: int):
         print("❌ Case not found or access denied.")
         return
     
-    # Show case summary
+                       
     print(f"\n{'='*50}")
     print(f"📁 CASE #{case_id} - {case['client_name']}")
     print(f"{'='*50}")
@@ -326,13 +330,13 @@ def chat_with_case(db: DatabaseManager, bot: SecureChatbot, user_id: int):
         elif not user_query:
             continue
         
-        # Get document context if available
+                                           
         docs = db.get_case_documents(case_id)
         doc_context = ""
         if docs:
             doc_context = "\n".join([d['parsed_text'][:2000] for d in docs])
         
-        # Build enriched query
+                              
         if doc_context:
             full_query = f"Document Context:\n{doc_context[:3000]}\n\nQuestion: {user_query}"
         else:
@@ -347,7 +351,7 @@ def export_case(generator: CaseGenerator, db: DatabaseManager, user_id: int):
     """Export case to PDF."""
     print_header("📥 EXPORT CASE TO PDF")
     
-    # List cases
+                
     cases = db.get_user_cases(user_id)
     if not cases:
         print("No cases found.")
@@ -361,7 +365,7 @@ def export_case(generator: CaseGenerator, db: DatabaseManager, user_id: int):
     
     try:
         case_id = int(case_id_input)
-        # Verify ownership
+                          
         case = db.get_case(case_id, user_id)
         if not case:
             print("❌ Case not found or access denied.")
@@ -381,13 +385,13 @@ def main():
     generator = CaseGenerator(GROQ_API_KEY)
     bot = SecureChatbot(GROQ_API_KEY)
     
-    # Authentication
+                    
     user_id, username = authenticate(db)
     
     if user_id is None:
         return
     
-    # Main loop
+               
     while True:
         print_main_menu(username)
         choice = input("\nSelect Option: ").strip()

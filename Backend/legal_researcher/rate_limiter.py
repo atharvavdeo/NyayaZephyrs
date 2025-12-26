@@ -1,3 +1,7 @@
+"""
+This module implements Token Bucket rate limiting to prevent abuse of the API and LLM resources.
+"""
+
 import time
 from collections import deque
 
@@ -15,13 +19,13 @@ class RateLimiter:
         Try to acquire a token. Returns True if allowed, False if rate limited.
         """
         current_time = time.time()
-        window_start = current_time - 60  # 1 minute window
+        window_start = current_time - 60                   
         
-        # Remove old requests outside the window
+                                                
         while self.requests and self.requests[0] < window_start:
             self.requests.popleft()
         
-        # Check if we're under the limit
+                                        
         if len(self.requests) < self.tokens_per_minute:
             self.requests.append(current_time)
             return True

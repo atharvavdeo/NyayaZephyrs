@@ -1,4 +1,8 @@
 """
+This module implements the Multi-Tenant Database Architecture. It defines the DatabaseRouter class which routes queries to isolated tenant databases (lawyer_X.db) or the master authentication database based on user context.
+"""
+
+"""
 Multi-Tenant Database Router
 ============================
 Implements secure database isolation per lawyer:
@@ -20,7 +24,7 @@ import bcrypt
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-# Configuration
+               
 BASE_DB_FOLDER = os.path.join(os.path.dirname(__file__), "databases")
 MASTER_DB_NAME = "master_auth.db"
 
@@ -36,15 +40,15 @@ class DatabaseRouter:
     """
     
     def __init__(self):
-        # Ensure the databases folder exists
+                                            
         if not os.path.exists(BASE_DB_FOLDER):
             os.makedirs(BASE_DB_FOLDER)
             logger.info(f"Created databases folder: {BASE_DB_FOLDER}")
         
-        # Initialize the Master DB (Auth only)
+                                              
         self._init_master_db()
     
-    # ==================== CONNECTION HANDLERS ====================
+                                                                   
     
     def get_master_conn(self) -> sqlite3.Connection:
         """
@@ -80,14 +84,14 @@ class DatabaseRouter:
         
         return conn
     
-    # ==================== MASTER DB SCHEMA ====================
+                                                                
     
     def _init_master_db(self):
         """Create the Users table in Master DB - contains NO case data."""
         with self.get_master_conn() as conn:
             cursor = conn.cursor()
             
-            # Users table - authentication only
+                                               
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,7 +103,7 @@ class DatabaseRouter:
                 )
             """)
             
-            # Audit log for authentication events (master-level)
+                                                                
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS auth_audit_logs (
                     log_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,7 +118,7 @@ class DatabaseRouter:
             """)
             conn.commit()
     
-    # ==================== TENANT DB SCHEMA ====================
+                                                                
     
     def _init_tenant_tables(self, conn: sqlite3.Connection):
         """
@@ -125,7 +129,7 @@ class DatabaseRouter:
         """
         cursor = conn.cursor()
         
-        # Cases table (no user_id - whole DB is user-scoped)
+                                                            
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS cases (
                 case_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,7 +142,7 @@ class DatabaseRouter:
             )
         """)
         
-        # Documents table
+                         
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS documents (
                 doc_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,7 +154,7 @@ class DatabaseRouter:
             )
         """)
         
-        # Chat logs table
+                         
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chat_logs (
                 log_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,7 +166,7 @@ class DatabaseRouter:
             )
         """)
         
-        # Tenant-level audit logs
+                                 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS audit_logs (
                 log_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -180,7 +184,7 @@ class DatabaseRouter:
         conn.commit()
         logger.info("Initialized tenant database schema")
     
-    # ==================== AUTHENTICATION METHODS (Master DB) ====================
+                                                                                  
     
     def register_user(self, username: str, password: str, email: str = None) -> Optional[int]:
         """
@@ -198,13 +202,13 @@ class DatabaseRouter:
                 )
                 user_id = cursor.lastrowid
                 
-                # Auto-create their tenant database
+                                                   
                 tenant_conn = self.get_tenant_conn(user_id)
                 tenant_conn.close()
                 
                 return user_id
         except sqlite3.IntegrityError:
-            return None  # Username already exists
+            return None                           
     
     def login_user(self, username: str, password: str) -> Optional[Dict]:
         """
@@ -219,7 +223,7 @@ class DatabaseRouter:
             user = cursor.fetchone()
             
             if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
-                # Update last login
+                                   
                 conn.execute(
                     "UPDATE users SET last_login = ? WHERE user_id = ?",
                     (datetime.now(), user['user_id'])
@@ -246,7 +250,7 @@ class DatabaseRouter:
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (user_id, action, ip_address, user_agent, status, details))
     
-    # ==================== CASE METHODS (Tenant DB) ====================
+                                                                        
     
     def create_case(self, user_id: int, client_name: str, raw_description: str = None, 
                     structured_data: str = "{}") -> int:
@@ -302,13 +306,13 @@ class DatabaseRouter:
     def delete_case(self, user_id: int, case_id: int) -> bool:
         """Delete a case from user's tenant database."""
         with self.get_tenant_conn(user_id) as conn:
-            # Delete related records first
+                                          
             conn.execute("DELETE FROM chat_logs WHERE case_id = ?", (case_id,))
             conn.execute("DELETE FROM documents WHERE case_id = ?", (case_id,))
             cursor = conn.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
             return cursor.rowcount > 0
     
-    # ==================== DOCUMENT METHODS (Tenant DB) ====================
+                                                                            
     
     def add_document(self, user_id: int, case_id: int, filename: str, parsed_text: str) -> int:
         """Add a document to a case in user's tenant database."""
@@ -328,7 +332,7 @@ class DatabaseRouter:
             )
             return cursor.fetchall()
     
-    # ==================== CHAT METHODS (Tenant DB) ====================
+                                                                        
     
     def add_chat_log(self, user_id: int, case_id: int, role: str, content: str):
         """Add a chat message in user's tenant database."""
@@ -346,14 +350,14 @@ class DatabaseRouter:
                 (case_id, limit)
             )
             rows = cursor.fetchall()
-            return rows[::-1]  # Reverse to chronological order
+            return rows[::-1]                                  
     
     def clear_chat_history(self, user_id: int, case_id: int):
         """Clear chat history for a case in user's tenant database."""
         with self.get_tenant_conn(user_id) as conn:
             conn.execute("DELETE FROM chat_logs WHERE case_id = ?", (case_id,))
     
-    # ==================== AUDIT METHODS (Tenant DB) ====================
+                                                                         
     
     def log_audit(self, user_id: int, action: str, resource_type: str = None,
                   resource_id: int = None, ip_address: str = None,
@@ -399,7 +403,7 @@ class DatabaseRouter:
             return cursor.fetchall()
 
 
-# Backward compatibility - create singleton instance
+                                                    
 _router_instance = None
 
 def get_db_router() -> DatabaseRouter:
@@ -410,5 +414,5 @@ def get_db_router() -> DatabaseRouter:
     return _router_instance
 
 
-# Alias for backward compatibility with old code
+                                                
 DatabaseManager = DatabaseRouter

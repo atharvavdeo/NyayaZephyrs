@@ -1,10 +1,14 @@
+"""
+This module allows for AI-powered Case Generation. It extracts structured legal data (parties, evidence, issues) from raw text/PDFs using LLMs and also handles PDF export functionality.
+"""
+
 import json
 import os
 from groq import Groq
 from fpdf import FPDF
 from database_manager import DatabaseManager
 
-# Get API key from environment or use default
+                                             
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 
 class CaseGenerator:
@@ -34,11 +38,11 @@ class CaseGenerator:
                     {"role": "system", "content": "You are a legal data extractor. Output JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1,  # Low temperature for consistency
+                temperature=0.1,                                   
                 response_format={"type": "json_object"}
             )
             
-            # Parse the result
+                              
             structured_data = json.loads(completion.choices[0].message.content)
             return structured_data
             
@@ -52,7 +56,7 @@ class CaseGenerator:
              print("❌ Error: user_id required for multi-tenant access")
              return None
 
-        # Secure DB access
+                          
         case = self.db.get_case(user_id, case_id)
         if not case:
             print("❌ Case not found or access denied.")
@@ -67,7 +71,7 @@ class CaseGenerator:
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         
-        # Header
+                
         pdf.set_font("Arial", 'B', 16)
         pdf.cell(200, 10, txt=f"Client Case File: #{case['case_id']}", ln=1, align='C')
         
@@ -76,11 +80,11 @@ class CaseGenerator:
         
         pdf.ln(10)
         
-        # Add details
+                     
         for key, value in data.items():
             formatted_key = key.replace("_", " ").title()
             
-            # Handle list items (like evidence)
+                                               
             if isinstance(value, list):
                 value = "\n  - " + "\n  - ".join(str(v) for v in value)
             
@@ -88,7 +92,7 @@ class CaseGenerator:
             pdf.cell(60, 8, txt=f"{formatted_key}:", ln=0)
             pdf.set_font("Arial", size=11)
             
-            # Use multi_cell for long content
+                                             
             if len(str(value)) > 50:
                 pdf.ln(8)
                 pdf.set_x(20)
@@ -98,7 +102,7 @@ class CaseGenerator:
             
             pdf.ln(2)
 
-        # Create exports directory
+                                  
         os.makedirs("exports", exist_ok=True)
         
         client_name = data.get('client_name', 'Client').replace(" ", "_").replace("/", "-")

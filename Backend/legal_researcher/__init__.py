@@ -1,4 +1,8 @@
 """
+This is the initialization file for the legal_researcher package.
+"""
+
+"""
 Legal Researcher Module
 =======================
 A production-grade legal case management system with:

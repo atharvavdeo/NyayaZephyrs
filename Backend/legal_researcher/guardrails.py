@@ -1,4 +1,8 @@
 """
+This module implements AI Guardrails. It sanitizes user inputs to prevent prompt injection and validates AI outputs to ensure safety and relevance.
+"""
+
+"""
 AI Security Guardrails for Legal Researcher
 =============================================
 Provides security layers to protect against:
@@ -15,26 +19,26 @@ from typing import List, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
-# ==================== INPUT SECURITY ====================
+                                                          
 
-# Patterns that indicate potential prompt injection attempts
+                                                            
 INJECTION_PATTERNS = [
     r"ignore\s+(all\s+)?previous\s+instructions?",
     r"disregard\s+(all\s+)?prior\s+instructions?",
     r"forget\s+(all\s+)?previous\s+context",
     r"ignore\s+(the\s+)?system\s+(message|prompt|instructions?)",
     r"override\s+(the\s+)?system",
-    r"you\s+are\s+now\s+(?!a\s+legal)",  # "You are now X" but not "You are now a legal..."
+    r"you\s+are\s+now\s+(?!a\s+legal)",                                                    
     r"pretend\s+(to\s+be|you're)",
     r"roleplay\s+as",
     r"act\s+as\s+if\s+you\s+(?!are\s+a\s+legal)",
     r"new\s+instructions?:",
-    r"</?(system|user|assistant)>",  # Role tag injection
-    r"\[INST\]|\[/INST\]",  # Llama format injection
-    r"<\|.*\|>",  # Special token injection
+    r"</?(system|user|assistant)>",                      
+    r"\[INST\]|\[/INST\]",                          
+    r"<\|.*\|>",                           
 ]
 
-# Forbidden topics for a legal assistant
+                                        
 FORBIDDEN_TOPICS = [
     r"\b(make|build|create|construct)\s+(a\s+)?(bomb|explosive|weapon)",
     r"\b(bomb|explosive|weapon)\s+(making|building|construction)\b",
@@ -57,31 +61,31 @@ def sanitize_input(user_query: str) -> Tuple[str, List[str]]:
     warnings = []
     sanitized = user_query
     
-    # 1. Check for prompt injection patterns
+                                            
     for pattern in INJECTION_PATTERNS:
         if re.search(pattern, sanitized, re.IGNORECASE):
             warnings.append(f"Potential prompt injection detected: pattern '{pattern[:30]}...'")
-            # Replace the injection attempt with a placeholder
+                                                              
             sanitized = re.sub(pattern, "[FILTERED]", sanitized, flags=re.IGNORECASE)
             logger.warning(f"Prompt injection attempt blocked: {pattern}")
     
-    # 2. Check for forbidden topics
+                                   
     for pattern in FORBIDDEN_TOPICS:
         if re.search(pattern, sanitized, re.IGNORECASE):
             warnings.append(f"Forbidden topic detected")
             logger.warning(f"Forbidden topic in query: {pattern}")
             return "[This query contains prohibited content and cannot be processed.]", warnings
     
-    # 3. Remove potential role markers
+                                      
     sanitized = re.sub(r'^\s*(system|user|assistant):\s*', '', sanitized, flags=re.IGNORECASE)
     
-    # 4. Limit query length (prevent token stuffing attacks)
+                                                            
     MAX_QUERY_LENGTH = 2000
     if len(sanitized) > MAX_QUERY_LENGTH:
         warnings.append(f"Query truncated from {len(sanitized)} to {MAX_QUERY_LENGTH} characters")
         sanitized = sanitized[:MAX_QUERY_LENGTH] + "... [truncated]"
     
-    # 5. Remove excessive whitespace (obfuscation prevention)
+                                                             
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     
     return sanitized, warnings
@@ -118,9 +122,9 @@ The following is the structured case data you are analyzing:
 - Do not speculate beyond the facts provided"""
 
 
-# ==================== OUTPUT SECURITY ====================
+                                                           
 
-# Phrases that indicate the AI refused a request (usually legitimate refusals)
+                                                                              
 REFUSAL_INDICATORS = [
     "I cannot fulfill this request",
     "I'm not able to help with that",
@@ -131,13 +135,13 @@ REFUSAL_INDICATORS = [
     "I must decline",
 ]
 
-# Patterns that should NEVER appear in output
+                                             
 FORBIDDEN_OUTPUT_PATTERNS = [
     r"here\s+is\s+how\s+to\s+(make|create|build)\s+a\s+(bomb|weapon|explosive)",
     r"instructions\s+for\s+illegal\s+activit",
-    r"<script>",  # XSS attempt in output
+    r"<script>",                         
     r"javascript:",
-    r"\bpassword\s*[:=]",  # Accidental credential leak
+    r"\bpassword\s*[:=]",                              
 ]
 
 
@@ -152,20 +156,20 @@ def validate_output(response: str) -> Tuple[str, List[str], bool]:
     is_blocked = False
     filtered = response
     
-    # 1. Check for forbidden output patterns
+                                            
     for pattern in FORBIDDEN_OUTPUT_PATTERNS:
         if re.search(pattern, filtered, re.IGNORECASE):
             warnings.append(f"Dangerous content detected in output")
             logger.warning(f"Blocked dangerous output matching: {pattern}")
             return "[Response blocked due to potentially harmful content]", warnings, True
     
-    # 2. Check for AI refusal (usually legitimate - pass through with note)
+                                                                           
     for phrase in REFUSAL_INDICATORS:
         if phrase.lower() in filtered.lower():
             warnings.append("AI declined the request (likely appropriate)")
             break
     
-    # 3. Detect potential prompt leak
+                                     
     if "=== SECURITY RULES" in filtered or "=== CASE DATA" in filtered:
         warnings.append("System prompt leak detected")
         filtered = re.sub(r'===.*?===', '[SYSTEM INFO REDACTED]', filtered, flags=re.DOTALL)
@@ -173,7 +177,7 @@ def validate_output(response: str) -> Tuple[str, List[str], bool]:
     return filtered, warnings, is_blocked
 
 
-# ==================== HALLUCINATION CHECKING ====================
+                                                                  
 
 def verify_citations(response: str, db_manager, case_id: int) -> Tuple[str, List[str]]:
     """
@@ -184,7 +188,7 @@ def verify_citations(response: str, db_manager, case_id: int) -> Tuple[str, List
     """
     warnings = []
     
-    # Extract potential case citations
+                                      
     citation_patterns = [
         r'[Cc]ase\s+#?(\d+)',
         r'[Cc]ase\s+ID\s*#?(\d+)',
@@ -196,20 +200,20 @@ def verify_citations(response: str, db_manager, case_id: int) -> Tuple[str, List
         matches = re.findall(pattern, response)
         cited_cases.update(int(m) for m in matches)
     
-    # Current case is always valid
+                                  
     cited_cases.discard(case_id)
     
-    # Verify each cited case exists
+                                   
     invalid_citations = []
     for cited_case_id in cited_cases:
-        # Check if case exists in database
+                                          
         case = db_manager.get_case(cited_case_id)
         if not case:
             invalid_citations.append(cited_case_id)
             warnings.append(f"Potential hallucination: Case #{cited_case_id} not found in database")
             logger.warning(f"AI cited non-existent case: #{cited_case_id}")
     
-    # Add warning to response if there are invalid citations
+                                                            
     if invalid_citations:
         warning_msg = f"\n\n⚠️ **Notice**: The following case references could not be verified: {', '.join(f'#{c}' for c in invalid_citations)}. Please verify independently."
         response += warning_msg
@@ -232,22 +236,22 @@ def apply_all_guardrails(
     """
     all_warnings = []
     
-    # Input guardrails
+                      
     sanitized_query, input_warnings = sanitize_input(user_query)
     all_warnings.extend(input_warnings)
     
-    # If input was blocked, don't process further
+                                                 
     if "[This query contains prohibited content" in sanitized_query:
         return sanitized_query, "I'm unable to process this request due to its content.", all_warnings
     
-    # Output guardrails
+                       
     validated_response, output_warnings, is_blocked = validate_output(ai_response)
     all_warnings.extend(output_warnings)
     
     if is_blocked:
         return sanitized_query, validated_response, all_warnings
     
-    # Hallucination check (only if db_manager is provided)
+                                                          
     if db_manager:
         validated_response, citation_warnings = verify_citations(validated_response, db_manager, case_id)
         all_warnings.extend(citation_warnings)
@@ -255,7 +259,7 @@ def apply_all_guardrails(
     return sanitized_query, validated_response, all_warnings
 
 
-# ==================== SECURE PROMPT BUILDER ====================
+                                                                 
 
 def build_messages_securely(
     case_data: dict,
@@ -271,20 +275,20 @@ def build_messages_securely(
     """
     messages = []
     
-    # System role: ONLY instructions, NO user data
+                                                  
     messages.append({
         "role": "system",
         "content": build_secure_prompt(case_data, case_id)
     })
     
-    # Add conversation history
+                              
     for msg in history:
         messages.append({
             "role": msg['role'],
             "content": msg['content']
         })
     
-    # Sanitize and add current query
+                                    
     sanitized_query, _ = sanitize_input(user_query)
     messages.append({
         "role": "user",

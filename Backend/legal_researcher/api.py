@@ -1,4 +1,8 @@
 """
+This module defines the FastAPI routes for the Legal AI Platform, handling authentication (JWT), case management, AI chat, and document processing endpoints. It serves as the primary interface for the frontend.
+"""
+
+"""
 Legal Researcher API Module - Frontend Integration
 ===================================================
 FastAPI endpoints exposing legal_researcher functionality:
@@ -36,7 +40,7 @@ import json
 import tempfile
 from PyPDF2 import PdfReader
 
-# Handle imports whether running standalone or as module
+                                                        
 _current_dir = os.path.dirname(os.path.abspath(__file__))
 if _current_dir not in sys.path:
     sys.path.insert(0, _current_dir)
@@ -56,10 +60,10 @@ from jwt_auth import (
     AuthResponse
 )
 
-# Get API key from environment
+                              
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 
-# Initialize global instances (lazy initialization for better import performance)
+                                                                                 
 _db_router = None
 _case_generator = None
 _chatbot = None
@@ -70,10 +74,10 @@ def get_db_router():
     """Get the DatabaseRouter for multi-tenant database access."""
     global _db_router
     if _db_router is None:
-        _db_router = DatabaseManager()  # DatabaseManager is now aliased to DatabaseRouter
+        _db_router = DatabaseManager()                                                    
     return _db_router
 
-# Backward compatibility alias
+                              
 def get_db_manager():
     return get_db_router()
 
@@ -101,16 +105,16 @@ def get_client_db():
         _client_db = ClientDB("client_database")
     return _client_db
 
-# Shortcuts for cleaner code
+                            
 db_manager = property(lambda self: get_db_manager())
 
-# Create router
+               
 router = APIRouter(prefix="/legal", tags=["Legal Researcher"])
 
 
-# ==================== PYDANTIC MODELS ====================
+                                                           
 
-# --- Auth Models ---
+                     
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=4)
@@ -125,7 +129,7 @@ class AuthResponse(BaseModel):
     user_id: Optional[int] = None
     username: Optional[str] = None
 
-# --- Case Models ---
+                     
 class ManualCaseCreate(BaseModel):
     """Create case with manual entry"""
     client_name: str
@@ -162,7 +166,7 @@ class ProgressUpdateRequest(BaseModel):
     progress: int = Field(..., ge=0, le=100, description="Progress percentage 0-100")
     stage: str = Field(..., description="Current stage: filing, trial, appeal, complete, etc.")
 
-# --- Chat Models ---
+                     
 class ChatRequest(BaseModel):
     case_id: int
     query: str = Field(..., min_length=1)
@@ -177,7 +181,7 @@ class ChatHistoryResponse(BaseModel):
     case_id: int
     messages: List[Dict[str, str]]
 
-# --- Legal Research Models ---
+                               
 class ResearchRequest(BaseModel):
     client_name: str
     case_title: str
@@ -202,7 +206,7 @@ class ResearchResponse(BaseModel):
     total_found: int
 
 
-# ==================== AUTH ENDPOINTS ====================
+                                                          
 
 @router.post("/auth/register", response_model=AuthResponse)
 async def register_user(request: RegisterRequest):
@@ -244,7 +248,7 @@ async def get_user_info(user_id: int):
     raise HTTPException(status_code=404, detail="User not found")
 
 
-# ==================== JWT AUTHENTICATION ENDPOINTS ====================
+                                                                        
 
 @router.post("/auth/register", response_model=AuthResponse)
 async def register_user(credentials: UserCredentials, request: Request):
@@ -257,10 +261,10 @@ async def register_user(credentials: UserCredentials, request: Request):
     db = get_db_manager()
     client_ip = request.client.host if request.client else "unknown"
     
-    # Check if user already exists
-    existing = db.login_user(credentials.username, "dummy")  # Will fail but checks existence
+                                  
+    existing = db.login_user(credentials.username, "dummy")                                  
     if existing is not True and existing is not False:
-        # User exists, log and reject
+                                     
         db.log_audit(
             action="REGISTER_FAILED",
             resource_type="auth",
@@ -270,12 +274,12 @@ async def register_user(credentials: UserCredentials, request: Request):
         )
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # Register the user
+                       
     success = db.register_user(credentials.username, credentials.password)
     if not success:
         raise HTTPException(status_code=400, detail="Registration failed - username may already exist")
     
-    # Login to get user_id and create token
+                                           
     user = db.login_user(credentials.username, credentials.password)
     if not user:
         raise HTTPException(status_code=500, detail="Registration succeeded but login failed")
@@ -283,7 +287,7 @@ async def register_user(credentials: UserCredentials, request: Request):
     user_id = user['user_id']
     token, expires_in = create_access_token(user_id, credentials.username)
     
-    # Log successful registration
+                                 
     db.log_audit(
         action="USER_REGISTERED",
         user_id=user_id,
@@ -315,7 +319,7 @@ async def login_user(credentials: UserCredentials, request: Request):
     user = db.login_user(credentials.username, credentials.password)
     
     if not user:
-        # Log failed login attempt
+                                  
         db.log_audit(
             action="LOGIN_FAILED",
             resource_type="auth",
@@ -329,7 +333,7 @@ async def login_user(credentials: UserCredentials, request: Request):
     user_id = user['user_id']
     token, expires_in = create_access_token(user_id, credentials.username)
     
-    # Log successful login
+                          
     db.log_audit(
         action="USER_LOGIN",
         user_id=user_id,
@@ -382,7 +386,7 @@ async def refresh_token(current_user: dict = Depends(get_current_user)):
     )
 
 
-# ==================== CASE MANAGEMENT ENDPOINTS ====================
+                                                                     
 
 @router.post("/cases/manual", response_model=CaseResponse)
 async def create_case_manual(case_data: ManualCaseCreate, user_id: int = Depends(get_user_id)):
@@ -402,13 +406,13 @@ async def create_case_manual(case_data: ManualCaseCreate, user_id: int = Depends
     }
     
     db = get_db_manager()
-    # Serialize to JSON for storage in SQLite
+                                             
     structured_json = json.dumps(structured_data)
     
-    # Log usage
+               
     print(f"Creating manual case for user {user_id}")
     
-    # New DatabaseRouter API: create_case(user_id, client_name, raw_description, structured_data)
+                                                                                                 
     case_id = db.create_case(user_id, case_data.client_name, raw_description=case_data.case_details, structured_data=structured_json)
     case = db.get_case(user_id, case_id)
     
@@ -428,7 +432,7 @@ async def create_case_ai(case_data: AICaseCreate, user_id: int = Depends(get_use
     AI extracts: client_name, opposing_party, incident_date, 
     legal_issue_summary, key_evidence_list, applicable_laws, recommended_actions.
     """
-    # AI extraction
+                   
     structured_data = get_case_generator().generate_case_structure(case_data.raw_notes)
     
     if not structured_data:
@@ -437,10 +441,10 @@ async def create_case_ai(case_data: AICaseCreate, user_id: int = Depends(get_use
     db = get_db_manager()
     client_name = structured_data.get('client_name', 'Unknown Client')
     
-    # Serialize to JSON
+                       
     structured_json = json.dumps(structured_data)
     
-    # New DatabaseRouter API
+                            
     case_id = db.create_case(user_id, client_name, raw_description=case_data.raw_notes, structured_data=structured_json)
     case = db.get_case(user_id, case_id)
     
@@ -466,14 +470,14 @@ async def create_case_from_pdf(
     if not filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
     
-    # Save uploaded file temporarily
+                                    
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         content = await file.read()
         tmp_file.write(content)
         tmp_path = tmp_file.name
     
     try:
-        # Extract text from PDF
+                               
         reader = PdfReader(tmp_path)
         full_text = ""
         for page in reader.pages:
@@ -486,7 +490,7 @@ async def create_case_from_pdf(
                 detail="Could not extract text from PDF. File may be scanned/image-based."
             )
         
-        # AI analysis (limit to first 5000 chars to avoid token limits)
+                                                                       
         structured_data = get_case_generator().generate_case_structure(full_text[:5000])
         
         if not structured_data:
@@ -496,10 +500,10 @@ async def create_case_from_pdf(
         
         db = get_db_manager()
         
-        # Serialize to JSON
+                           
         structured_json = json.dumps(structured_data)
         
-        # Save case
+                   
         case_id = db.create_case(
             user_id, 
             client_name, 
@@ -507,7 +511,7 @@ async def create_case_from_pdf(
             structured_data=structured_json
         )
         
-        # Save document text
+                            
         db.add_document(user_id, case_id, filename, full_text)
         
         case = db.get_case(user_id, case_id)
@@ -525,7 +529,7 @@ async def create_case_from_pdf(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF processing failed: {str(e)}")
     finally:
-        # Cleanup temp file
+                           
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
@@ -541,10 +545,10 @@ async def list_user_cases(user_id: int = Depends(get_user_id)):
     
     case_list = []
     for case in cases:
-        # User-scoped document retrieval
+                                        
         docs = db.get_case_documents(user_id, case['case_id'])
         
-        # Safe JSON loading
+                           
         try:
             struct_data = json.loads(case['structured_data']) if case['structured_data'] else {}
         except:
@@ -573,15 +577,15 @@ async def get_case(case_id: int, request: Request, user_id: int = Depends(get_us
     Logs access for audit trail.
     """
     db = get_db_manager()
-    # New DatabaseRouter API: get_case(user_id, case_id)
+                                                        
     case = db.get_case(user_id, case_id)
     
-    # Log the access attempt
+                            
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     
     if not case:
-        # Log failed access attempt
+                                   
         db.log_audit(
             user_id=user_id,
             action="VIEW_CASE_DENIED",
@@ -594,7 +598,7 @@ async def get_case(case_id: int, request: Request, user_id: int = Depends(get_us
         )
         raise HTTPException(status_code=404, detail="Case not found or access denied")
     
-    # Log successful access
+                           
     db.log_audit(
         user_id=user_id,
         action="VIEW_CASE",
@@ -605,10 +609,10 @@ async def get_case(case_id: int, request: Request, user_id: int = Depends(get_us
         details=f"Viewed case: {case['client_name']}"
     )
     
-    # User-scoped document retrieval
+                                    
     docs = db.get_case_documents(user_id, case_id)
     
-    # Safe JSON loading
+                       
     try:
         struct_data = json.loads(case['structured_data']) if case['structured_data'] else {}
     except:
@@ -637,10 +641,10 @@ async def delete_case(case_id: int, request: Request, user_id: int = Depends(get
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     
-    # New DatabaseRouter API: delete_case(user_id, case_id)
+                                                           
     success = db.delete_case(user_id, case_id)
     if success:
-        # Log successful deletion
+                                 
         db.log_audit(
             user_id=user_id,
             action="DELETE_CASE",
@@ -652,7 +656,7 @@ async def delete_case(case_id: int, request: Request, user_id: int = Depends(get
         )
         return {"success": True, "message": f"Case #{case_id} deleted"}
     
-    # Log failed deletion attempt (usually meant it already didn't exist or belonged to someone else)
+                                                                                                     
     db.log_audit(
         user_id=user_id,
         action="DELETE_CASE_DENIED",
@@ -673,7 +677,7 @@ async def update_case_progress(case_id: int, request: ProgressUpdateRequest, use
     Sets is_complete to True when stage is 'complete'.
     """
     db = get_db_manager()
-    # Using user_id from token, NOT from request body (strict siloing)
+                                                                      
     success = db.update_case_progress(user_id, case_id, request.progress, request.stage)
     
     if success:
@@ -688,7 +692,7 @@ async def update_case_progress(case_id: int, request: ProgressUpdateRequest, use
     raise HTTPException(status_code=404, detail="Case not found or access denied")
 
 
-# ==================== CHAT ENDPOINTS ====================
+                                                          
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_case(request: ChatRequest, user_id: int = Depends(get_user_id)):
@@ -698,27 +702,27 @@ async def chat_with_case(request: ChatRequest, user_id: int = Depends(get_user_i
     Supports multilingual input/output via translation middleware.
     Rate limited to prevent API abuse.
     """
-    # Verify ownership before chatting
+                                      
     db = get_db_manager()
     case = db.get_case(user_id, request.case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found or access denied")
 
-    # Translate user query to English if needed
+                                               
     query_in_english = request.query
     if request.language != 'en':
         query_in_english = translate_to_english(request.query, source_lang=request.language)
     
-    # Get response from chatbot (in English)
-    # Chatbot needs to know user_id to load correct history
-    # We update chatbot call to pass user_id? No, chatbot usually delegates to DB.
-    # We need to update SecureChatbot to handle user_id or inject history manually.
-    # For now, let's look at SecureChatbot later. Assume it uses get_db_manager() which won't work without user_id context!
-    # PROBLEM: SecureChatbot uses get_db_manager().get_chat_history(case_id).
-    # New DatabaseRouter.get_chat_history requires user_id.
-    # We must refactor SecureChatbot too. 
-    # For this step, I'll pass user_id to chatbot if I can, or temporarily break it.
-    # Actually, better to catch this in next step.
+                                            
+                                                           
+                                                                                  
+                                                                                   
+                                                                                                                           
+                                                                             
+                                                           
+                                          
+                                                                                    
+                                                  
     
     response = get_chatbot().chat_with_case(request.case_id, query_in_english, user_id=user_id)
     
@@ -727,7 +731,7 @@ async def chat_with_case(request: ChatRequest, user_id: int = Depends(get_user_i
     if response.startswith("❌"):
         raise HTTPException(status_code=400, detail=response)
     
-    # Translate response back to user's language if needed
+                                                          
     final_response = response
     if request.language != 'en':
         final_response = translate_from_english(response, target_lang=request.language)
@@ -762,12 +766,12 @@ async def get_case_summary(case_id: int, user_id: int = Depends(get_user_id)):
     """
     Get a formatted summary of a case.
     """
-    # Need to update chatbot to accept user_id
+                                              
     summary = get_chatbot().get_case_summary(case_id, user_id=user_id)
     return {"case_id": case_id, "summary": summary}
 
 
-# ==================== PDF EXPORT ENDPOINT ====================
+                                                               
 
 @router.get("/export/{case_id}")
 async def export_case_pdf(case_id: int, request: Request, user_id: int = Depends(get_user_id)):
@@ -776,7 +780,7 @@ async def export_case_pdf(case_id: int, request: Request, user_id: int = Depends
     Returns the PDF file for download.
     Logs export for audit trail.
     """
-    # Verify ownership
+                      
     db = get_db_manager()
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
@@ -795,18 +799,18 @@ async def export_case_pdf(case_id: int, request: Request, user_id: int = Depends
         )
         raise HTTPException(status_code=404, detail="Case not found or access denied")
     
-    # Generate PDF
-    # CaseGenerator needs user_id to fetch data?
-    # export_case_to_pdf(case_id) fetches case from DB.
-    # It probably uses get_db_manager().get_case(case_id).
-    # That will FAIL because get_case now requires user_id.
-    # We must refactor CaseGenerator too.
+                  
+                                                
+                                                       
+                                                          
+                                                           
+                                         
     filename = get_case_generator().export_case_to_pdf(case_id, user_id=user_id)
     
     if not filename or not os.path.exists(filename):
         raise HTTPException(status_code=500, detail="Failed to generate PDF")
     
-    # Log successful export
+                           
     db.log_audit(
         user_id=user_id,
         action="EXPORT_PDF",
@@ -824,7 +828,7 @@ async def export_case_pdf(case_id: int, request: Request, user_id: int = Depends
     )
 
 
-# ==================== LEGAL RESEARCH ENDPOINTS ====================
+                                                                    
 
 @router.post("/research", response_model=ResearchResponse)
 async def conduct_legal_research(request: ResearchRequest):
@@ -837,7 +841,7 @@ async def conduct_legal_research(request: ResearchRequest):
     try:
         researcher = get_legal_researcher()
         
-        # Step 1: Find relevant cases
+                                     
         urls = researcher.find_relevant_cases(request.description)
         
         if not urls:
@@ -849,16 +853,16 @@ async def conduct_legal_research(request: ResearchRequest):
                 total_found=0
             )
         
-        # Step 2: Scrape case details
+                                     
         raw_cases = researcher.get_case_details(urls)
         
-        # Step 3: Extract structured data + AI summaries
+                                                        
         formatted_results = []
         for url, doc in raw_cases:
             md = doc.markdown if hasattr(doc, 'markdown') else ''
             case_info = researcher.extract_case_info(md, url)
             
-            # Generate AI Summary
+                                 
             case_info["ai_summary"] = researcher.summarize_case(md, case_info['case_title'])
             
             formatted_results.append(CaseInfo(
@@ -873,7 +877,7 @@ async def conduct_legal_research(request: ResearchRequest):
                 ai_summary=case_info.get('ai_summary')
             ))
         
-        # Step 4: Save to client database (JSON)
+                                                
         case_data_package = {
             "title": request.case_title,
             "description": request.description,
@@ -911,7 +915,7 @@ async def get_research_history(client_name: str):
     return {"client_name": client_name, "searches": data}
 
 
-# ==================== STATS ENDPOINT ====================
+                                                          
 
 @router.get("/stats/{user_id}")
 async def get_user_stats(user_id: int):
@@ -931,7 +935,7 @@ async def get_user_stats(user_id: int):
         history = db.get_chat_history(case['case_id'], limit=1000)
         total_chats += len(history)
     
-    # Estimate time saved: ~5 min per document + ~2 min per chat query
+                                                                      
     total_minutes_saved = (total_docs * 5) + (total_chats * 2) + (len(cases) * 10)
     time_saved_hours = total_minutes_saved // 60
     time_saved_minutes = total_minutes_saved % 60
@@ -946,7 +950,7 @@ async def get_user_stats(user_id: int):
     }
 
 
-# ==================== AUDIT LOGS ENDPOINTS ====================
+                                                                
 
 @router.get("/audit/logs")
 async def get_audit_logs(
@@ -1016,7 +1020,7 @@ async def get_resource_audit_history(resource_type: str, resource_id: int, limit
     }
 
 
-# ==================== INTEGRATION HELPER ====================
+                                                              
 
 def include_router_to_app(app):
     """
@@ -1028,7 +1032,7 @@ def include_router_to_app(app):
     app.include_router(router)
 
 
-# ==================== STANDALONE SERVER ====================
+                                                             
 
 def create_standalone_app() -> FastAPI:
     """
@@ -1039,7 +1043,7 @@ def create_standalone_app() -> FastAPI:
     async def lifespan(app: FastAPI):
         """Initialize services on startup."""
         print("⚖️  Initializing Legal Researcher API...")
-        # Trigger lazy initialization
+                                     
         get_db_manager()
         print("✅ Database initialized")
         print("✅ Legal Researcher API ready!")
@@ -1068,7 +1072,7 @@ def create_standalone_app() -> FastAPI:
         lifespan=lifespan
     )
     
-    # Add CORS
+              
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -1077,7 +1081,7 @@ def create_standalone_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-    # Include the router
+                        
     app.include_router(router)
     
     @app.get("/")
@@ -1096,7 +1100,7 @@ def create_standalone_app() -> FastAPI:
     return app
 
 
-# Run standalone server when executed directly
+                                              
 if __name__ == "__main__":
     import uvicorn
     
