@@ -61,9 +61,18 @@ export default function ClientsPage() {
 
     const fetchClients = async () => {
         try {
-            const res = await fetch("http://localhost:8000/clients");
+            // Use Legal Researcher cases API instead of non-existent /clients
+            const res = await fetch("http://localhost:8000/legal/cases?user_id=1");
             const data = await res.json();
-            setClients(data);
+            // Map cases to client format
+            const clientList = data.cases?.map((c: any) => ({
+                id: c.case_id,
+                name: c.client_name || "Unknown Client",
+                email: c.structured_data?.email || "",
+                phone: c.structured_data?.phone || "",
+                status: c.is_complete ? "Completed" : "Active"
+            })) || [];
+            setClients(clientList);
         } catch (err) {
             console.error("Failed to fetch clients", err);
         }
@@ -72,10 +81,14 @@ export default function ClientsPage() {
     const handleCreateClient = async () => {
         try {
             setLoading(true);
-            await fetch("http://localhost:8000/clients", {
+            // Use Legal Researcher cases API to create a new case as a client
+            await fetch("http://localhost:8000/legal/cases/manual?user_id=1", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: newClientName, contact_email: newClientEmail })
+                body: JSON.stringify({
+                    client_name: newClientName,
+                    legal_issue_summary: `New client: ${newClientEmail}`
+                })
             });
             setShowNewClientModal(false);
             setNewClientName("");
@@ -91,9 +104,26 @@ export default function ClientsPage() {
     const handleClientClick = async (id: number) => {
         try {
             setLoading(true);
-            const res = await fetch(`http://localhost:8000/clients/${id}`);
+            // Use Legal Researcher case API to get case details
+            const res = await fetch(`http://localhost:8000/legal/cases/${id}?user_id=1`);
             const data = await res.json();
-            setSelectedClient(data);
+            // Map to expected format
+            setSelectedClient({
+                client: {
+                    id: data.case_id,
+                    name: data.client_name || "Unknown Client",
+                    email: data.structured_data?.email || ""
+                },
+                cases: [{
+                    id: data.case_id,
+                    case_title: data.client_name,
+                    case_type: data.structured_data?.case_type || "General",
+                    description: data.raw_description || "",
+                    created_at: data.created_at,
+                    structured_data: data.structured_data || {},
+                    citations: []
+                }]
+            });
             setView("detail");
         } catch (err) {
             console.error(err);
@@ -106,13 +136,14 @@ export default function ClientsPage() {
         if (!rawNotes.trim()) return;
         setAnalyzing(true);
         try {
-            const res = await fetch("http://localhost:8000/clients/analyze", {
+            // Use Legal Researcher AI case creation endpoint
+            const res = await fetch("http://localhost:8000/legal/cases/ai-extract?user_id=1", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ client_id: selectedClient.client.id, raw_notes: rawNotes })
+                body: JSON.stringify({ raw_notes: rawNotes })
             });
             if (res.ok) {
-                handleClientClick(selectedClient.client.id);
+                fetchClients();
                 setShowNewCaseModal(false);
                 setRawNotes("");
             }
@@ -139,10 +170,11 @@ export default function ClientsPage() {
         setChatLoading(true);
 
         try {
-            const res = await fetch("http://localhost:8000/clients/chat", {
+            // Use Legal Researcher chat endpoint
+            const res = await fetch("http://localhost:8000/legal/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ case_id: recentCase.id, query: userMsg })
+                body: JSON.stringify({ case_id: recentCase.id, query: userMsg, language: "en" })
             });
             const data = await res.json();
             if (res.ok) {
@@ -288,7 +320,7 @@ export default function ClientsPage() {
                             {c.citations.map((cite: any, i: number) => (
                                 <div key={i} className="bg-white p-3 rounded-lg border border-cyan-100 shadow-sm">
                                     <div className="flex justify-between items-start mb-1">
-                                        <p className="font-semibold text-[#1a1a1a] text-sm">{cite.case_title || cite.title || `Citation ${i+1}`}</p>
+                                        <p className="font-semibold text-[#1a1a1a] text-sm">{cite.case_title || cite.title || `Citation ${i + 1}`}</p>
                                         <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded">{cite.court || cite.case_type || "Legal"}</span>
                                     </div>
                                     {cite.ai_summary && <p className="text-xs text-gray-600 mt-1">{cite.ai_summary}</p>}

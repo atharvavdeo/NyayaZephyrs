@@ -398,35 +398,12 @@ function CustomersPage() {
   );
 }
 
-// Sample data for Dashboard
-const ongoingCases = [
-  { id: "2024-0042", parties: "Kumar vs State", progress: 80, stage: "Appeal" },
-  { id: "2024-0038", parties: "Singh vs Corp", progress: 50, stage: "Trial" },
-  { id: "2024-0045", parties: "Sharma vs Bank", progress: 30, stage: "Filing" },
-];
-
-const completedCases = [
-  { id: "2024-0035", parties: "Patel vs State", verdict: "WON", details: "Acquitted", date: "Dec 20" },
-  { id: "2024-0031", parties: "Verma vs Corp", verdict: "SETTLED", details: "Rs.5L", date: "Dec 18" },
-  { id: "2024-0028", parties: "Gupta vs Union", verdict: "LOST", details: "Dismissed", date: "Dec 15" },
-  { id: "2024-0025", parties: "Reddy vs Bank", verdict: "WON", details: "Damages Awarded", date: "Dec 10" },
-  { id: "2024-0021", parties: "Khan vs State", verdict: "WON", details: "Released", date: "Dec 05" },
-];
-
+// Sample data for Dashboard (only calendar events are still static)
 const calendarEvents = [
   { date: "Dec 26", event: "Hearing", caseId: "#42", upcoming: true },
   { date: "Dec 28", event: "Filing", caseId: "#38", upcoming: false },
   { date: "Jan 02", event: "Hearing", caseId: "#45", upcoming: false },
   { date: "Jan 05", event: "Review", caseId: "#42", upcoming: false },
-];
-
-const documentLibrary = [
-  { name: "Kumar vs State", date: "Dec 24, 2024" },
-  { name: "Singh vs Corp", date: "Dec 20, 2024" },
-  { name: "Sharma vs Bank", date: "Dec 18, 2024" },
-  { name: "Patel vs State", date: "Dec 15, 2024" },
-  { name: "Verma vs Corp", date: "Dec 12, 2024" },
-  { name: "Gupta vs Union", date: "Dec 10, 2024" },
 ];
 
 // Top Navbar Component (replaces Sidebar)
@@ -617,7 +594,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     if (!sessionId) return;
     setProcessing(true);
     try {
-      const response = await fetch(`http://localhost:8000/reanalyze/${sessionId}`, { method: "POST" });
+      const response = await fetch(`http://localhost:8000/legal/documents/reanalyze/${sessionId}`, { method: "POST" });
       if (response.ok) {
         const data = await response.json();
         setMetadata(data.metadata);
@@ -636,7 +613,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const response = await fetch("http://localhost:8000/documents");
+        const response = await fetch("http://localhost:8000/legal/documents?user_id=1");
         if (response.ok) {
           const data = await response.json();
           setDbDocuments(data.documents || []);
@@ -655,7 +632,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     setProcessing(true);
     try {
       // Fetch document metadata from the metadata endpoint
-      let metaResponse = await fetch(`http://localhost:8000/metadata/${doc.file_hash}`);
+      let metaResponse = await fetch(`http://localhost:8000/legal/documents/${doc.file_hash}/metadata`);
       if (metaResponse.ok) {
         let metaData = await metaResponse.json();
         console.log("Received metadata:", metaData);
@@ -669,10 +646,10 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
         console.log("Metadata state updated");
 
         // Set file preview URL if file exists in data folder
-        setFileUrl(`http://localhost:8000/files/${doc.file_hash}`);
+        setFileUrl(`http://localhost:8000/legal/documents/${doc.file_hash}/file`);
 
         // Fetch chat history
-        const historyResponse = await fetch(`http://localhost:8000/history/${doc.file_hash}`);
+        const historyResponse = await fetch(`http://localhost:8000/legal/documents/${doc.file_hash}/history`);
         if (historyResponse.ok) {
           const historyData = await historyResponse.json();
           const chatMessages = historyData.messages?.map((msg: any) => ({
@@ -716,9 +693,10 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("user_id", "1"); // Default user_id
 
     try {
-      const response = await fetch("http://localhost:8000/upload", {
+      const response = await fetch("http://localhost:8000/legal/cases/pdf-upload", {
         method: "POST",
         body: formData,
       });
@@ -729,13 +707,26 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       }
 
       const data = await response.json();
-      setSessionId(data.file_hash);
-      setMetadata(data.metadata);
+      // Backend returns CaseResponse with case_id, client_name, structured_data
+      setSessionId(data.case_id.toString());
+      // Set metadata with field names that match the UI display
+      setMetadata({
+        case_title: data.client_name || file.name,
+        case_number: `CASE-${data.case_id}`,
+        doc_type: data.structured_data?.case_type || "Legal Document",
+        court: data.structured_data?.court || "General Court",
+        judge: data.structured_data?.judge || "Not specified",
+        appellant: data.client_name || "Not specified",
+        respondent: data.structured_data?.opposing_party || "Not specified",
+        detailed_summary: data.structured_data?.legal_issue_summary || "Document analyzed successfully. You can now ask questions about this case.",
+        verdict: data.stage || "In Progress",
+        victim: data.structured_data?.victim || null
+      });
 
-      // Add initial analysis message - kept simple
+      // Add initial analysis message
       setMessages(prev => [...prev, {
         role: "ai",
-        content: `[DOC] **Document Analyzed: ${file.name}**\n\n[CHAT] You can now ask questions about this document.`
+        content: `[DOC] **Document Analyzed: ${file.name}**\n\n**Client:** ${data.client_name || "Unknown"}\n**Case Type:** ${data.structured_data?.case_type || "General"}\n\n[CHAT] You can now ask questions about this document. Case ID: #${data.case_id}`
       }]);
 
     } catch (error) {
@@ -761,10 +752,10 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     setMessages(prev => [...prev, { role: "user", content: userText }]);
 
     try {
-      const response = await fetch("http://localhost:8000/chat", {
+      const response = await fetch("http://localhost:8000/legal/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_hash: sessionId, query: userText })
+        body: JSON.stringify({ case_id: parseInt(sessionId), query: userText, language: "en" })
       });
 
       if (!response.ok) throw new Error("Chat failed");
@@ -1145,7 +1136,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch("http://localhost:8000/stats");
+        const response = await fetch("http://localhost:8000/legal/stats/1");
         if (response.ok) {
           const data = await response.json();
           setDashboardStats(data);
@@ -1300,24 +1291,36 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       <div className="flex-1 relative z-10 pt-20 p-8">
         {/* Dashboard Header */}
         <div className="mb-8 p-4">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="text-[28px] sm:text-[36px] md:text-[48px] font-normal mb-2 tracking-[-0.02em] leading-[1.15]"
-            style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}
-          >
-            <span className="text-[#1a1a1a]">Legal Dashboard</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-            className="text-[14px] sm:text-[16px] text-[#666] font-normal"
-            style={{ fontFamily: "Montserrat, sans-serif" }}
-          >
-            Manage your cases and track progress
-          </motion.p>
+          <div className="flex justify-between items-start">
+            <div>
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.3 }}
+                className="text-[28px] sm:text-[36px] md:text-[48px] font-normal mb-2 tracking-[-0.02em] leading-[1.15]"
+                style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}
+              >
+                <span className="text-[#1a1a1a]">Legal Dashboard</span>
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.5 }}
+                className="text-[14px] sm:text-[16px] text-[#666] font-normal"
+                style={{ fontFamily: "Montserrat, sans-serif" }}
+              >
+                Manage your cases and track progress
+              </motion.p>
+            </div>
+            {/* Language Selector */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <LanguageSelector variant="dropdown" />
+            </motion.div>
+          </div>
         </div>
 
         {/* Top Stats Row */}
