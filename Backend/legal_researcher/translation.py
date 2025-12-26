@@ -36,7 +36,12 @@ SUPPORTED_LANGUAGES = {
     'th': 'Thai',
     'bn': 'Bengali',
     'ta': 'Tamil',
-    'te': 'Telugu'
+    'te': 'Telugu',
+    'mr': 'Marathi',
+    'gu': 'Gujarati',
+    'kn': 'Kannada',
+    'ml': 'Malayalam',
+    'pa': 'Punjabi'
 }
 
 

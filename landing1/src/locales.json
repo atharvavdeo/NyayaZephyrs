@@ -400,5 +400,101 @@
         "actions": "操作",
         "completed_cases": "已完成案件",
         "document_library": "文档库"
+    },
+    "ta": {
+        "dashboard": "டாஷ்போர்டு",
+        "documents": "ஆவணங்கள்",
+        "my_cases": "என் வழக்குகள்",
+        "settings": "அமைப்புகள்",
+        "clients": "வாடிக்கையாளர்கள்",
+        "legal_researcher": "சட்ட ஆராய்ச்சியாளர்",
+        "logout": "வெளியேறு",
+        "ongoing_cases": "நடைபெறும் வழக்குகள்",
+        "completed_cases": "முடிந்த வழக்குகள்",
+        "document_library": "ஆவண நூலகம்"
+    },
+    "te": {
+        "dashboard": "డాష్‌బోర్డ్",
+        "documents": "పత్రాలు",
+        "my_cases": "నా కేసులు",
+        "settings": "సెట్టింగ్‌లు",
+        "clients": "క్లయింట్లు",
+        "legal_researcher": "న్యాయ పరిశోధకుడు",
+        "logout": "లాగ్అవుట్",
+        "ongoing_cases": "కొనసాగుతున్న కేసులు",
+        "completed_cases": "పూర్తయిన కేసులు",
+        "document_library": "పత్ర గ్రంథాలయం"
+    },
+    "bn": {
+        "dashboard": "ড্যাশবোর্ড",
+        "documents": "নথি",
+        "my_cases": "আমার মামলা",
+        "settings": "সেটিংস",
+        "clients": "ক্লায়েন্ট",
+        "legal_researcher": "আইনি গবেষক",
+        "logout": "লগআউট",
+        "ongoing_cases": "চলমান মামলা",
+        "completed_cases": "সম্পন্ন মামলা",
+        "document_library": "নথি গ্রন্থাগার"
+    },
+    "mr": {
+        "dashboard": "डॅशबोर्ड",
+        "documents": "कागदपत्रे",
+        "my_cases": "माझे खटले",
+        "settings": "सेटिंग्ज",
+        "clients": "ग्राहक",
+        "legal_researcher": "कायदेशीर संशोधक",
+        "logout": "लॉग आउट",
+        "ongoing_cases": "चालू खटले",
+        "completed_cases": "पूर्ण खटले",
+        "document_library": "दस्तऐवज ग्रंथालय"
+    },
+    "gu": {
+        "dashboard": "ડેશબોર્ડ",
+        "documents": "દસ્તાવેજો",
+        "my_cases": "મારા કેસો",
+        "settings": "સેટિંગ્સ",
+        "clients": "ગ્રાહકો",
+        "legal_researcher": "કાનૂની સંશોધક",
+        "logout": "લૉગ આઉટ",
+        "ongoing_cases": "ચાલુ કેસો",
+        "completed_cases": "પૂર્ણ કેસો",
+        "document_library": "દસ્તાવેજ પુસ્તકાલય"
+    },
+    "kn": {
+        "dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+        "documents": "ದಾಖಲೆಗಳು",
+        "my_cases": "ನನ್ನ ಪ್ರಕರಣಗಳು",
+        "settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+        "clients": "ಗ್ರಾಹಕರು",
+        "legal_researcher": "ಕಾನೂನು ಸಂಶೋಧಕ",
+        "logout": "ಲಾಗ್ಔಟ್",
+        "ongoing_cases": "ನಡೆಯುತ್ತಿರುವ ಪ್ರಕರಣಗಳು",
+        "completed_cases": "ಪೂರ್ಣಗೊಂಡ ಪ್ರಕರಣಗಳು",
+        "document_library": "ದಾಖಲೆ ಗ್ರಂಥಾಲಯ"
+    },
+    "ml": {
+        "dashboard": "ഡാഷ്‌ബോർഡ്",
+        "documents": "രേഖകൾ",
+        "my_cases": "എന്റെ കേസുകൾ",
+        "settings": "ക്രമീകരണങ്ങൾ",
+        "clients": "ക്ലയൻ്റുകൾ",
+        "legal_researcher": "നിയമ ഗവേഷകൻ",
+        "logout": "ലോഗ്ഔട്ട്",
+        "ongoing_cases": "നടന്നുകൊണ്ടിരിക്കുന്ന കേസുകൾ",
+        "completed_cases": "പൂർത്തിയാക്കിയ കേസുകൾ",
+        "document_library": "രേഖ ഗ്രന്ഥാലയം"
+    },
+    "pa": {
+        "dashboard": "ਡੈਸ਼ਬੋਰਡ",
+        "documents": "ਦਸਤਾਵੇਜ਼",
+        "my_cases": "ਮੇਰੇ ਕੇਸ",
+        "settings": "ਸੈਟਿੰਗਾਂ",
+        "clients": "ਗਾਹਕ",
+        "legal_researcher": "ਕਾਨੂੰਨੀ ਖੋਜਕਰਤਾ",
+        "logout": "ਲੌਗ ਆਊਟ",
+        "ongoing_cases": "ਚੱਲ ਰਹੇ ਕੇਸ",
+        "completed_cases": "ਪੂਰੇ ਕੇਸ",
+        "document_library": "ਦਸਤਾਵੇਜ਼ ਲਾਇਬ੍ਰੇਰੀ"
     }
 }
