@@ -1096,7 +1096,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
                           onClick={() => setShowFullSummary(true)}
                           className="px-3 py-1.5 bg-[#6b5744] text-white rounded text-xs font-medium hover:bg-[#5a4838] transition-colors"
                         >
-                           Full Summary
+                          Full Summary
                         </button>
                       )}
                     </div>
@@ -2384,7 +2384,7 @@ function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docume
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher">("landing");
+  const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher">("dashboard");
 
   // Landing page doesn't need LanguageProvider
   if (currentPage === "landing") {

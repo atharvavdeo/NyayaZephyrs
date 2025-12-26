@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Github, Scale, Gavel, History, FileText, Database, Cpu, MessageSquare, Search, Upload, Zap, Shield, Globe, Send } from 'lucide-react';
+import { ArrowRight, Github, Scale, Gavel, History, FileText, Database, Cpu, Search, Upload, Zap, Shield, Globe, Send } from 'lucide-react';
 
 // Tetris Background Component
 const TetrisBackground = () => {
@@ -82,7 +82,7 @@ const Navbar = () => {
           </a>
         </div>
 
-        <button 
+        <button
           onClick={() => navigate('/dashboard')}
           className="px-6 py-2.5 text-xs font-black uppercase tracking-[0.15em] bg-[#1a1a1a] text-[#f97316] hover:bg-[#2a2a2a] transition-all shadow-lg border border-[#f97316]/20">
           Get Started
@@ -95,7 +95,7 @@ const Navbar = () => {
 // Hero Section Component
 const Hero = () => {
   const navigate = useNavigate();
-  
+
   return (
     <section className="relative pt-32 pb-24 min-h-screen flex items-center" style={{
       backgroundImage: 'linear-gradient(rgba(139, 115, 85, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 115, 85, 0.05) 1px, transparent 1px)',
@@ -189,7 +189,7 @@ const ArchitectureGrid = () => {
 
   // Architecture flow: the order in which boxes highlight
   const flowSequence = [1, 2, 3, 4, 5, 6]; // PYMUPDF → CHUNKING → MPNET → PINECONE → GROQ → SQLITE
-  
+
   // Connections between boxes (from → to)
   const connections = [
     { from: 1, to: 2, direction: 'right' },
@@ -202,11 +202,11 @@ const ArchitectureGrid = () => {
   // Auto-cycle through the architecture flow
   useEffect(() => {
     if (!isAnimating) return;
-    
+
     const interval = setInterval(() => {
       setActiveStep((prev) => (prev + 1) % flowSequence.length);
     }, 1500);
-    
+
     return () => clearInterval(interval);
   }, [isAnimating]);
 
@@ -229,43 +229,39 @@ const ArchitectureGrid = () => {
 
   const currentActiveId = flowSequence[activeStep];
   const nextActiveId = flowSequence[(activeStep + 1) % flowSequence.length];
-  
+
   // Find the active connection (arrow to show)
   const activeConnection = connections.find(c => c.from === currentActiveId && c.to === nextActiveId);
 
   // Render a single architecture box
-  const renderBox = (box: typeof boxes[0], index: number, showArrow: boolean) => {
+  const renderBox = (box: typeof boxes[0], _index: number, showArrow: boolean) => {
     const Icon = box.icon;
     const isActive = currentActiveId === box.id;
     const isPast = flowSequence.indexOf(box.id) < activeStep;
-    
+
     return (
       <div key={box.id} className="relative">
         <div
-          className={`relative p-5 rounded-xl transition-all duration-500 ${
-            isActive
+          className={`relative p-5 rounded-xl transition-all duration-500 ${isActive
               ? 'bg-[#f5f1e8] border-2 border-[#f97316] shadow-lg scale-[1.03] ring-2 ring-[#f97316]/20'
               : isPast
-              ? 'bg-[#f5f1e8] border border-[#f97316]/50'
-              : 'bg-[#e8e4db] border border-[#d4b896]/40'
-          }`}
+                ? 'bg-[#f5f1e8] border border-[#f97316]/50'
+                : 'bg-[#e8e4db] border border-[#d4b896]/40'
+            }`}
         >
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-all duration-300 ${
-            isActive ? 'bg-[#f97316]/30' : isPast ? 'bg-[#f97316]/15' : 'bg-[#d4b896]/30'
-          }`}>
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-all duration-300 ${isActive ? 'bg-[#f97316]/30' : isPast ? 'bg-[#f97316]/15' : 'bg-[#d4b896]/30'
+            }`}>
             <Icon size={20} className={isActive || isPast ? 'text-[#f97316]' : 'text-[#6b5c45]'} />
           </div>
-          <h4 className={`text-[11px] font-black uppercase tracking-[0.1em] mb-1.5 transition-colors duration-300 ${
-            isActive ? 'text-[#1a1a1a]' : isPast ? 'text-[#2d2d2d]' : 'text-[#3a3a3a]'
-          }`}>
+          <h4 className={`text-[11px] font-black uppercase tracking-[0.1em] mb-1.5 transition-colors duration-300 ${isActive ? 'text-[#1a1a1a]' : isPast ? 'text-[#2d2d2d]' : 'text-[#3a3a3a]'
+            }`}>
             {box.label}
           </h4>
-          <p className={`text-[10px] leading-relaxed font-medium ${
-            isActive ? 'text-[#4a4a4a]' : 'text-[#5a5a5a]'
-          }`}>
+          <p className={`text-[10px] leading-relaxed font-medium ${isActive ? 'text-[#4a4a4a]' : 'text-[#5a5a5a]'
+            }`}>
             {box.description}
           </p>
-          
+
           {/* Active indicator pulse */}
           {isActive && (
             <div className="absolute -top-1 -right-1 w-3 h-3">
@@ -274,20 +270,19 @@ const ArchitectureGrid = () => {
             </div>
           )}
         </div>
-        
+
         {/* Horizontal Arrow to next box */}
         {showArrow && (
-          <div className={`absolute top-1/2 -right-3 transform -translate-y-1/2 z-10 transition-all duration-300 ${
-            activeConnection?.from === box.id && activeConnection?.direction === 'right'
+          <div className={`absolute top-1/2 -right-3 transform -translate-y-1/2 z-10 transition-all duration-300 ${activeConnection?.from === box.id && activeConnection?.direction === 'right'
               ? 'opacity-100 scale-110'
               : 'opacity-30 scale-100'
-          }`}>
+            }`}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path 
-                d="M5 12H19M19 12L13 6M19 12L13 18" 
+              <path
+                d="M5 12H19M19 12L13 6M19 12L13 18"
                 stroke={activeConnection?.from === box.id ? '#f97316' : '#8b7355'}
-                strokeWidth="2" 
-                strokeLinecap="round" 
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className={activeConnection?.from === box.id ? 'animate-pulse' : ''}
               />
@@ -299,7 +294,7 @@ const ArchitectureGrid = () => {
   };
 
   return (
-    <div 
+    <div
       className="bg-[#f5f1e8] rounded-2xl p-6 border border-[#d4b896]/30 shadow-xl"
       onMouseEnter={() => setIsAnimating(false)}
       onMouseLeave={() => setIsAnimating(true)}
@@ -320,18 +315,17 @@ const ArchitectureGrid = () => {
         </div>
 
         {/* Vertical Arrow from row 1 to row 2 (box 3 to box 4) */}
-        <div className={`flex justify-start pl-[16.67%] mb-3 transition-all duration-300 ${
-          activeConnection?.from === 3 && activeConnection?.to === 4
+        <div className={`flex justify-start pl-[16.67%] mb-3 transition-all duration-300 ${activeConnection?.from === 3 && activeConnection?.to === 4
             ? 'opacity-100'
             : 'opacity-30'
-        }`}>
+          }`}>
           <div className="flex flex-col items-center">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={activeConnection?.from === 3 ? 'animate-bounce' : ''}>
-              <path 
-                d="M12 5V19M12 19L6 13M12 19L18 13" 
+              <path
+                d="M12 5V19M12 19L6 13M12 19L18 13"
                 stroke={activeConnection?.from === 3 ? '#f97316' : '#8b7355'}
-                strokeWidth="2" 
-                strokeLinecap="round" 
+                strokeWidth="2"
+                strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>
@@ -398,7 +392,7 @@ const SandboxPreview = () => {
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-        <div className="bg-[#1a1a1a] rounded-xl overflow-hidden shadow-2xl border border-[#f97316]/20">
+      <div className="bg-[#1a1a1a] rounded-xl overflow-hidden shadow-2xl border border-[#f97316]/20">
         <div className="bg-[#2a2a2a] px-6 py-4 flex items-center justify-between border-b border-[#f97316]/10">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
@@ -625,7 +619,7 @@ export default function NyayaZephyrLanding() {
           backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(249, 115, 22, 0.05) 1px, transparent 0)',
           backgroundSize: '40px 40px'
         }} />
-        
+
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left Side - Text Content */}
@@ -654,7 +648,7 @@ export default function NyayaZephyrLanding() {
                     </>
                   }
                 />
-                
+
                 <FeatureItem
                   icon={Database}
                   title="Pinecone"
@@ -665,7 +659,7 @@ export default function NyayaZephyrLanding() {
                     </>
                   }
                 />
-                
+
                 <FeatureItem
                   icon={Zap}
                   title="Llama 3.3"
