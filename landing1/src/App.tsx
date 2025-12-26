@@ -2,11 +2,11 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { useQuery } from "@apollo/client/react";
 import { cn } from "@/lib/utils";
-import { GET_DASHBOARD } from "./graphql/client";
 import ClientsPage from "./ClientsPage";
 import LegalResearcherPage from "./LegalResearcherPage";
+import { LanguageProvider, useLanguage } from "./LanguageContext";
+import { LanguageSelector } from "./LanguageSelector";
 
 interface Block {
   id: number;
@@ -430,6 +430,15 @@ const documentLibrary = [
 
 // Sidebar Component
 function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher"; onNavigate: (page: "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher") => void }) {
+  // Try to use language context, but provide fallback for landing page
+  let t = (key: string) => key;
+  try {
+    const langContext = useLanguage();
+    t = langContext.t;
+  } catch (e) {
+    // Not wrapped in LanguageProvider (landing page), use fallback
+  }
+
   return (
     <div className="w-64 bg-[#f3eed2] border-r border-[#d4cdb8] flex flex-col h-screen fixed left-0 top-0 z-50">
       <div className="p-6 flex items-center gap-3">
@@ -450,7 +459,7 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
           </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>Dashboard</span>
+          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('dashboard')}</span>
         </button>
         <button
           onClick={() => onNavigate("clients")}
@@ -462,7 +471,7 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>Clients</span>
+          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('clients')}</span>
         </button>
         <button
           onClick={() => onNavigate("my-cases")}
@@ -474,7 +483,7 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
           </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>My Cases</span>
+          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('my_cases')}</span>
         </button>
         <button
           onClick={() => onNavigate("documents")}
@@ -486,7 +495,7 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>Documents</span>
+          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('documents')}</span>
         </button>
         <button
           onClick={() => onNavigate("settings")}
@@ -499,7 +508,7 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>Settings</span>
+          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('settings')}</span>
         </button>
         <button
           onClick={() => onNavigate("legal-researcher")}
@@ -511,8 +520,13 @@ function Sidebar({ activePage, onNavigate }: { activePage: "dashboard" | "docume
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <span style={{ fontFamily: "Montserrat, sans-serif" }}>Legal Research</span>
+          <span style={{ fontFamily: "Montserrat, sans-serif" }}>{t('legal_researcher')}</span>
         </button>
+      </div>
+
+      {/* Language Selector */}
+      <div className="px-4 py-3 border-t border-[#d4cdb8]">
+        <LanguageSelector />
       </div>
 
       <div className="p-6 border-t border-[#d4cdb8]">
@@ -1266,7 +1280,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     time_saved_hours: 0,
     time_saved_minutes: 0
   });
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [_statsLoading, setStatsLoading] = useState(true);
 
   // Fetch real stats from backend
   useEffect(() => {
@@ -1297,15 +1311,6 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
   const ongoingCasesData = ongoingCases;
   const completedCasesData = completedCases;
   const documentLibraryData = documentLibrary;
-
-  const getVerdictColor = (verdict: string) => {
-    switch (verdict) {
-      case "WON": return "bg-green-500";
-      case "LOST": return "bg-red-500";
-      case "SETTLED": return "bg-yellow-500";
-      default: return "bg-gray-500";
-    }
-  };
 
   const getVerdictEmoji = (verdict: string) => {
     switch (verdict) {
@@ -2381,49 +2386,54 @@ function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docume
 export default function App() {
   const [currentPage, setCurrentPage] = useState<"landing" | "customers" | "dashboard" | "documents" | "my-cases" | "settings" | "clients" | "legal-researcher">("landing");
 
-  if (currentPage === "clients") {
-    return (
-      <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
-        <Sidebar activePage="clients" onNavigate={(page) => setCurrentPage(page)} />
-        <div className="flex-1 relative z-10 ml-64 p-8">
-          <ClientsPage />
-        </div>
-      </div>
-    );
+  // Landing page doesn't need LanguageProvider
+  if (currentPage === "landing") {
+    return <LandingPage onMeetCustomers={() => setCurrentPage("customers")} onDashboard={() => setCurrentPage("dashboard")} />;
   }
 
+  // Customers page (public facing, no sidebar)
   if (currentPage === "customers") {
-    return <CustomersPage />
+    return <CustomersPage />;
   }
 
-  if (currentPage === "dashboard") {
-    return <DashboardPage onNavigate={(page) => setCurrentPage(page)} />;
-  }
-
-  if (currentPage === "documents") {
-    return <DocumentsPage onNavigate={(page) => setCurrentPage(page)} />;
-  }
-
-  if (currentPage === "my-cases") {
-    return <MyCasesPage onNavigate={(page) => setCurrentPage(page)} />;
-  }
-
-  if (currentPage === "settings") {
-    return <SettingsPage onNavigate={(page) => setCurrentPage(page)} />;
-  }
-
-  if (currentPage === "legal-researcher") {
-    return (
-      <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
-        <Sidebar activePage="legal-researcher" onNavigate={(page) => setCurrentPage(page)} />
-        <div className="flex-1 relative z-10 ml-64">
-          <LegalResearcherPage />
+  // All dashboard pages wrapped with LanguageProvider for multilingual support
+  return (
+    <LanguageProvider>
+      {currentPage === "clients" && (
+        <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
+          <Sidebar activePage="clients" onNavigate={(page) => setCurrentPage(page)} />
+          <div className="flex-1 relative z-10 ml-64 p-8">
+            <ClientsPage />
+          </div>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  return <LandingPage onMeetCustomers={() => setCurrentPage("customers")} onDashboard={() => setCurrentPage("dashboard")} />;
+      {currentPage === "dashboard" && (
+        <DashboardPage onNavigate={(page) => setCurrentPage(page)} />
+      )}
+
+      {currentPage === "documents" && (
+        <DocumentsPage onNavigate={(page) => setCurrentPage(page)} />
+      )}
+
+      {currentPage === "my-cases" && (
+        <MyCasesPage onNavigate={(page) => setCurrentPage(page)} />
+      )}
+
+      {currentPage === "settings" && (
+        <SettingsPage onNavigate={(page) => setCurrentPage(page)} />
+      )}
+
+      {currentPage === "legal-researcher" && (
+        <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
+          <Sidebar activePage="legal-researcher" onNavigate={(page) => setCurrentPage(page)} />
+          <div className="flex-1 relative z-10 ml-64">
+            <LegalResearcherPage />
+          </div>
+        </div>
+      )}
+    </LanguageProvider>
+  );
 }
 
 

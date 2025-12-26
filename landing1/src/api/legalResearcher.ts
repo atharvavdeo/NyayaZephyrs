@@ -133,12 +133,12 @@ export async function createCaseManual(userId: number, data: CaseCreateManual): 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { success: false, message: errorData.detail || "Failed to create case" };
     }
-    
+
     const backendCase: BackendCase = await response.json();
     return {
       success: true,
@@ -157,12 +157,12 @@ export async function createCaseAI(userId: number, data: CaseCreateAI): Promise<
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { success: false, message: errorData.detail || "AI extraction failed" };
     }
-    
+
     const backendCase: BackendCase = await response.json();
     return {
       success: true,
@@ -183,12 +183,12 @@ export async function uploadCasePDF(userId: number, file: File): Promise<CaseRes
       method: "POST",
       body: formData,
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { success: false, message: errorData.detail || "PDF upload failed" };
     }
-    
+
     const backendCase: BackendCase = await response.json();
     return {
       success: true,
@@ -203,11 +203,11 @@ export async function uploadCasePDF(userId: number, file: File): Promise<CaseRes
 export async function getUserCases(userId: number): Promise<CaseListResponse> {
   try {
     const response = await fetch(`${API_BASE}/cases?user_id=${userId}`);
-    
+
     if (!response.ok) {
       return { success: false, cases: [], total: 0 };
     }
-    
+
     const data: { cases: BackendCase[]; total: number } = await response.json();
     return {
       success: true,
@@ -222,12 +222,12 @@ export async function getUserCases(userId: number): Promise<CaseListResponse> {
 export async function getCase(caseId: number, userId: number): Promise<CaseResponse> {
   try {
     const response = await fetch(`${API_BASE}/cases/${caseId}?user_id=${userId}`);
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { success: false, message: errorData.detail || "Case not found" };
     }
-    
+
     const backendCase: BackendCase = await response.json();
     return {
       success: true,
@@ -244,12 +244,12 @@ export async function deleteCase(caseId: number, userId: number): Promise<{ succ
     const response = await fetch(`${API_BASE}/cases/${caseId}?user_id=${userId}`, {
       method: "DELETE",
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { success: false, message: errorData.detail || "Failed to delete" };
     }
-    
+
     const data = await response.json();
     return { success: true, message: data.message || "Case deleted" };
   } catch (error) {
@@ -262,6 +262,7 @@ export async function deleteCase(caseId: number, userId: number): Promise<{ succ
 export interface ChatRequest {
   case_id: number;
   query: string;
+  language?: string;
 }
 
 export interface ChatResponse {
@@ -297,12 +298,12 @@ export async function chatWithCase(data: ChatRequest): Promise<ChatResponse> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { success: false, message: errorData.detail || "Chat failed" };
     }
-    
+
     const chatData = await response.json();
     return {
       success: true,
@@ -317,11 +318,11 @@ export async function chatWithCase(data: ChatRequest): Promise<ChatResponse> {
 export async function getChatHistory(caseId: number): Promise<ChatHistoryResponse> {
   try {
     const response = await fetch(`${API_BASE}/chat/history/${caseId}`);
-    
+
     if (!response.ok) {
       return { success: false, messages: [] };
     }
-    
+
     const data = await response.json();
     return {
       success: true,
@@ -336,11 +337,11 @@ export async function getChatHistory(caseId: number): Promise<ChatHistoryRespons
 export async function getChatSummary(caseId: number): Promise<ChatSummaryResponse> {
   try {
     const response = await fetch(`${API_BASE}/chat/summary/${caseId}`);
-    
+
     if (!response.ok) {
       return { success: false, message: "Failed to get summary" };
     }
-    
+
     const data = await response.json();
     return {
       success: true,
@@ -357,11 +358,11 @@ export async function clearChatHistory(caseId: number): Promise<{ success: boole
     const response = await fetch(`${API_BASE}/chat/history/${caseId}`, {
       method: "DELETE",
     });
-    
+
     if (!response.ok) {
       return { success: false, message: "Failed to clear history" };
     }
-    
+
     const data = await response.json();
     return { success: true, message: data.message || "History cleared" };
   } catch (error) {
@@ -430,14 +431,14 @@ export async function conductResearch(data: ResearchRequest): Promise<ResearchRe
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { success: false, message: errorData.detail || "Research failed" };
     }
-    
+
     const backendData: BackendResearchResponse = await response.json();
-    
+
     // Transform backend response to frontend format
     const relevantCases: CaseInfo[] = backendData.results.map((r) => ({
       title: r.case_title,
@@ -465,7 +466,7 @@ export async function conductResearch(data: ResearchRequest): Promise<ResearchRe
       .filter((r) => r.ai_summary)
       .map((r) => r.ai_summary)
       .slice(0, 3);
-    const summary = summaryParts.length > 0 
+    const summary = summaryParts.length > 0
       ? `Found ${backendData.total_found} relevant cases. ${summaryParts.join(" ")}`
       : `Found ${backendData.total_found} relevant cases from Indian Kanoon.`;
 
@@ -477,7 +478,7 @@ export async function conductResearch(data: ResearchRequest): Promise<ResearchRe
       }
     });
     const mostCommonVerdict = Object.entries(verdictCounts).sort((a, b) => b[1] - a[1])[0];
-    const recommendedStrategy = mostCommonVerdict 
+    const recommendedStrategy = mostCommonVerdict
       ? `Based on similar cases, the most common outcome was "${mostCommonVerdict[0]}". Review the cited cases carefully and build your arguments around the established precedents.`
       : `Review the ${backendData.total_found} cases found to identify applicable legal precedents and build your case strategy.`;
 
@@ -499,11 +500,11 @@ export async function conductResearch(data: ResearchRequest): Promise<ResearchRe
 export async function getResearchHistory(clientName: string): Promise<{ success: boolean; research_history: ResearchResult[] }> {
   try {
     const response = await fetch(`${API_BASE}/research/history/${encodeURIComponent(clientName)}`);
-    
+
     if (!response.ok) {
       return { success: false, research_history: [] };
     }
-    
+
     const data = await response.json();
     return {
       success: true,
@@ -519,11 +520,11 @@ export async function getResearchHistory(clientName: string): Promise<{ success:
 export async function exportCasePDF(caseId: number, userId: number): Promise<Blob | null> {
   try {
     const response = await fetch(`${API_BASE}/export/${caseId}?user_id=${userId}`);
-    
+
     if (!response.ok) {
       return null;
     }
-    
+
     return await response.blob();
   } catch (error) {
     return null;
@@ -547,11 +548,11 @@ export interface UserStatsResponse {
 export async function getUserStats(userId: number): Promise<UserStatsResponse> {
   try {
     const response = await fetch(`${API_BASE}/stats/${userId}`);
-    
+
     if (!response.ok) {
       return { success: false, message: "Failed to get stats" };
     }
-    
+
     const data = await response.json();
     return {
       success: true,

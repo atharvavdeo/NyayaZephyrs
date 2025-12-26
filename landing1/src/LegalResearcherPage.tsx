@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLanguage } from "./LanguageContext";
 import {
   getUserCases,
   createCaseManual,
@@ -39,7 +40,7 @@ function CreateCaseModal({ onClose, onCaseCreated }: CreateCaseModalProps) {
   const [legalIssueSummary, setLegalIssueSummary] = useState("");
   const [keyEvidence, setKeyEvidence] = useState("");
   const [applicableLaws, setApplicableLaws] = useState("");
-  const [recommendedActions, setRecommendedActions] = useState("");
+  const [recommendedActions, _setRecommendedActions] = useState("");
 
   // AI extraction
   const [rawNotes, setRawNotes] = useState("");
@@ -362,6 +363,7 @@ interface CaseDetailProps {
 }
 
 function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
+  const { language } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -413,7 +415,7 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
     setLoading(true);
 
     try {
-      const res = await chatWithCase({ case_id: caseData.case_id, query: userMsg });
+      const res = await chatWithCase({ case_id: caseData.case_id, query: userMsg, language: language });
       if (res.success && res.response) {
         setMessages((prev) => [...prev, { role: "assistant", content: res.response! }]);
       } else {
@@ -613,7 +615,7 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
             // Research Panel
             <div className="flex flex-col h-full p-4 overflow-y-auto">
               <h3 className="text-lg font-medium text-[#1a1a1a] mb-4">Legal Research - Indian Kanoon</h3>
-              
+
               {researching ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
@@ -764,7 +766,7 @@ interface LegalResearcherPageProps {
   onNavigate?: (page: string) => void;
 }
 
-export default function LegalResearcherPage({ onNavigate }: LegalResearcherPageProps) {
+export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalResearcherPageProps) {
   const [cases, setCases] = useState<CaseDetails[]>([]);
   const [selectedCase, setSelectedCase] = useState<CaseDetails | null>(null);
   const [loading, setLoading] = useState(true);

@@ -45,6 +45,7 @@ from database_manager import DatabaseManager
 from case_generator import CaseGenerator
 from secure_chat import SecureChatbot
 from legal_researcher import LegalResearcher, ClientDB, FIRECRAWL_API_KEY
+from translation import translate_to_english, translate_from_english, get_supported_languages
 
 # Get API key from environment
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
@@ -142,10 +143,12 @@ class CaseListResponse(BaseModel):
 class ChatRequest(BaseModel):
     case_id: int
     query: str = Field(..., min_length=1)
+    language: str = Field(default="en", description="Language code for translation (e.g., 'es', 'hi', 'fr')")
 
 class ChatResponse(BaseModel):
     response: str
     case_id: int
+    language: str = "en"
 
 class ChatHistoryResponse(BaseModel):
     case_id: int
@@ -413,16 +416,28 @@ async def chat_with_case(request: ChatRequest):
     """
     Context-aware chat with a specific case.
     Includes case data + document context + conversation history.
+    Supports multilingual input/output via translation middleware.
     Rate limited to prevent API abuse.
     """
-    response = get_chatbot().chat_with_case(request.case_id, request.query)
+    # Translate user query to English if needed
+    query_in_english = request.query
+    if request.language != 'en':
+        query_in_english = translate_to_english(request.query, source_lang=request.language)
+    
+    # Get response from chatbot (in English)
+    response = get_chatbot().chat_with_case(request.case_id, query_in_english)
     
     if response.startswith("⚠️ Rate limit"):
         raise HTTPException(status_code=429, detail=response)
     if response.startswith("❌"):
         raise HTTPException(status_code=400, detail=response)
     
-    return ChatResponse(response=response, case_id=request.case_id)
+    # Translate response back to user's language if needed
+    final_response = response
+    if request.language != 'en':
+        final_response = translate_from_english(response, target_lang=request.language)
+    
+    return ChatResponse(response=final_response, case_id=request.case_id, language=request.language)
 
 
 @router.get("/chat/history/{case_id}", response_model=ChatHistoryResponse)
