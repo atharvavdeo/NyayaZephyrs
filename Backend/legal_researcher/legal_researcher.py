@@ -11,8 +11,8 @@ from firecrawl import Firecrawl
 from langchain_groq import ChatGroq
 
                        
-FIRECRAWL_API_KEY = "fc-307f55e4b6ee44368d75d122da15d675"                     
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")                
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")                
 DB_DIRECTORY = "client_database"                                          
 
                                         

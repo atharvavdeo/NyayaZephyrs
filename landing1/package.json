@@ -12,6 +12,8 @@
   "dependencies": {
     "@apollo/client": "^4.0.11",
     "@tailwindcss/vite": "^4.1.17",
+    "@types/canvas-confetti": "^1.9.0",
+    "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.25",
     "graphql": "^16.12.0",

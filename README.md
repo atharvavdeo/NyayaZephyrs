@@ -6,6 +6,25 @@
 > **Branding**: NyayaZephyr Intelligence Systems  
 > **🔗 Live Demo**: [https://nyayazephyr.vercel.app](https://landing1-9ceab148d-atharva-deos-projects.vercel.app)
 
+---
+
+## 📸 App Preview
+
+### Landing Page
+![Landing Page Hero](./LandingPage1.png)
+![Landing Page Features](./LandingPage2.png)
+
+### Dashboard
+![Dashboard Overview](./Dashboard.png)
+
+### Document Analyzer
+![Document Analysis Interface](./Doc%20Analyser.png)
+
+### Legal Researcher
+![Research Module](./Researcher.png)
+
+---
+
 ## 📖 Table of Contents
 1. [Executive Summary](#-executive-summary)
 2. [Tech Stack](#-tech-stack)

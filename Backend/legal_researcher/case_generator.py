@@ -9,7 +9,9 @@ from fpdf import FPDF
 from database_manager import DatabaseManager
 
                                              
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise RuntimeError("GROQ_API_KEY not found in environment. Please set it in .env file.")
 
 class CaseGenerator:
     def __init__(self, api_key: str = None):
