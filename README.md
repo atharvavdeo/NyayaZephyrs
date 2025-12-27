@@ -2,8 +2,9 @@
 
 > **Status**: Active Development  
 > **Version**: 2.1.0 (Multi-Tenant + Enhanced Security)  
-> **Security Level**: High (JWT, Audit Logging, AI Guardrails, Input Sanitization)
-> **Branding**: NyayaZephyr Intelligence Systems
+> **Security Level**: High (JWT, Audit Logging, AI Guardrails, Input Sanitization)  
+> **Branding**: NyayaZephyr Intelligence Systems  
+> **🔗 Live Demo**: [https://nyayazephyr.vercel.app](https://landing1-9ceab148d-atharva-deos-projects.vercel.app)
 
 ## 📖 Table of Contents
 1. [Executive Summary](#-executive-summary)
