@@ -63,3 +63,5 @@ build/
 htmlcov/
 .coverage
 .pytest_cache/
+.vercel
+Zephyrs-ZeroDayPPT.pdf
