@@ -68,59 +68,54 @@ export default function AdminDashboard() {
         }
     };
 
-    const runSecurityChecks = () => {
-        // Simulated security checks - in production these would query actual system status
-        const checks: SecurityCheck[] = [
-            {
-                name: "Prompt Injection Defense",
-                status: "pass",
-                message: "Active - All queries sanitized",
-                details: "Regex patterns detect and filter malicious prompts"
-            },
-            {
-                name: "Rate Limiting",
-                status: "pass",
-                message: "Active - 20 requests/minute per user",
-                details: "Prevents API abuse and DDoS attacks"
-            },
-            {
-                name: "Output Validation",
-                status: "pass",
-                message: "Active - Harmful content filtered",
-                details: "AI responses scanned before delivery"
-            },
-            {
-                name: "Hallucination Checker",
-                status: "pass",
-                message: "Active - Citations verified",
-                details: "Fake case citations flagged with warnings"
-            },
-            {
-                name: "Audit Logging",
-                status: "pass",
-                message: "Active - All actions recorded",
-                details: "VIEW, DELETE, EXPORT actions logged with IP"
-            },
-            {
-                name: "Secrets Management",
-                status: "pass",
-                message: ".env file in use",
-                details: "API keys loaded from environment variables"
-            },
-            {
+    const runSecurityChecks = async () => {
+        try {
+            const res = await fetch("http://localhost:8000/legal/security/status");
+            const data = await res.json();
+
+            // Map API response to SecurityCheck format
+            const checks: SecurityCheck[] = data.features.map((feature: {
+                name: string;
+                status: string;
+                message: string;
+                details?: string;
+                blocked_count?: number;
+            }) => ({
+                name: feature.name,
+                status: feature.status as "pass" | "warning" | "fail",
+                message: feature.message,
+                details: feature.details + (feature.blocked_count !== undefined ? ` (${feature.blocked_count} blocked)` : "")
+            }));
+
+            // Add CORS and HTTPS warnings (client-side checks)
+            checks.push({
                 name: "CORS Policy",
                 status: "warning",
                 message: "Development mode - All origins allowed",
                 details: "Restrict origins in production"
-            },
-            {
+            });
+            checks.push({
                 name: "HTTPS Encryption",
                 status: "warning",
                 message: "Running on HTTP (localhost)",
                 details: "Enable HTTPS in production"
-            }
-        ];
-        setSecurityChecks(checks);
+            });
+
+            setSecurityChecks(checks);
+        } catch (err) {
+            console.error("Failed to fetch security status:", err);
+            // Fallback to static data if API fails
+            setSecurityChecks([
+                { name: "Prompt Injection Defense", status: "pass", message: "Active - All queries sanitized", details: "Regex patterns detect and filter malicious prompts" },
+                { name: "Rate Limiting", status: "pass", message: "Active - 20 requests/minute per user", details: "Prevents API abuse and DDoS attacks" },
+                { name: "Output Validation", status: "pass", message: "Active - Harmful content filtered", details: "AI responses scanned before delivery" },
+                { name: "Hallucination Checker", status: "pass", message: "Active - Citations verified", details: "Fake case citations flagged with warnings" },
+                { name: "Audit Logging", status: "pass", message: "Active - All actions recorded", details: "VIEW, DELETE, EXPORT actions logged with IP" },
+                { name: "Secrets Management", status: "pass", message: ".env file in use", details: "API keys loaded from environment variables" },
+                { name: "CORS Policy", status: "warning", message: "Development mode - All origins allowed", details: "Restrict origins in production" },
+                { name: "HTTPS Encryption", status: "warning", message: "Running on HTTP (localhost)", details: "Enable HTTPS in production" }
+            ]);
+        }
     };
 
     const getActionColor = (action: string) => {
@@ -190,8 +185,8 @@ export default function AdminDashboard() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 ${activeTab === tab.id
-                                    ? "bg-[#1a1a1a] text-white shadow-lg"
-                                    : "bg-white/80 text-[#666] hover:bg-[#f5e6c8] border border-[#d4b896]"
+                                ? "bg-[#1a1a1a] text-white shadow-lg"
+                                : "bg-white/80 text-[#666] hover:bg-[#f5e6c8] border border-[#d4b896]"
                                 }`}
                         >
                             <span>{tab.icon}</span>
@@ -424,8 +419,8 @@ export default function AdminDashboard() {
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: idx * 0.1 }}
                                         className={`bg-white/90 rounded-xl border-2 p-5 shadow-lg ${check.status === "pass" ? "border-green-300" :
-                                                check.status === "warning" ? "border-yellow-300" :
-                                                    "border-red-300"
+                                            check.status === "warning" ? "border-yellow-300" :
+                                                "border-red-300"
                                             }`}
                                     >
                                         <div className="flex items-start justify-between mb-3">

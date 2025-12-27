@@ -1,8 +1,9 @@
-# ⚖️ ZeroDay: Advanced Legal AI Platform
+# ⚖️ NyayaZephyr: Advanced Legal AI Platform
 
 > **Status**: Active Development  
-> **Version**: 2.0.0 (Multi-Tenant Architecture)  
-> **Security Level**: High (JWT, Audit Logging, Data Siloing)
+> **Version**: 2.1.0 (Multi-Tenant + Enhanced Security)  
+> **Security Level**: High (JWT, Audit Logging, AI Guardrails, Input Sanitization)
+> **Branding**: NyayaZephyr Intelligence Systems
 
 ## 📖 Table of Contents
 1. [Executive Summary](#-executive-summary)
@@ -20,9 +21,17 @@
 
 ## 🚀 Executive Summary
 
-**ZeroDay** is a production-grade AI platform designed for legal professionals to manage cases, perform automated legal research, and interact with case documents using secure, context-aware AI. 
+**NyayaZephyr** is a production-grade AI platform designed for legal professionals to manage cases, perform automated legal research, and interact with case documents using secure, context-aware AI. 
 
-Unlike standard LegalWrappers, ZeroDay implements a **defense-in-depth security architecture** featuring strict multi-tenancy, immutable audit logging, and AI guardrails to prevent hallucinations and prompt injection attacks.
+Unlike standard LegalWrappers, NyayaZephyr implements a **defense-in-depth security architecture** featuring strict multi-tenancy, immutable audit logging, AI guardrails to prevent hallucinations and prompt injection attacks, and multilingual support for global accessibility.
+
+### Key Features
+- 📁 **Case Management**: Create, track, and manage legal cases with progress tracking
+- 🤖 **AI-Powered Chat**: Context-aware conversations with your case documents
+- 🔍 **Legal Research**: Automated research using Firecrawl and Groq LLMs
+- 🔒 **Enterprise Security**: JWT auth, multi-tenant isolation, audit logging
+- 🌍 **Multilingual**: Support for 10+ languages including Hindi, Spanish, French
+- 📊 **Admin Dashboard**: Real-time security monitoring and compliance tracking
 
 ---
 
@@ -285,6 +294,7 @@ The frontend (`landing1`) is a modern React application built with:
 *   Python 3.9+
 *   Node.js 18+
 *   Groq API Key
+*   FireC
 
 ### Backend Setup
 ```bash

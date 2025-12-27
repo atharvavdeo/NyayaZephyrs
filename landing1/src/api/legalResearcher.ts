@@ -1,7 +1,7 @@
 // Legal Researcher API Service
 // Connects to the backend API at /legal/* endpoints
 
-const API_BASE = "http://localhost:8000/legal";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/legal";
 
 // ==================== AUTH ====================
 
@@ -127,7 +127,7 @@ export async function updateCaseProgress(
   caseId: number,
   data: ProgressUpdateRequest
 ): Promise<ProgressUpdateResponse> {
-  const response = await fetch(`${API_BASE}/cases/${caseId}/progress`, {
+  const response = await fetch(`${API_BASE}/cases/${caseId}/progress?user_id=${data.user_id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -331,9 +331,9 @@ export interface ChatSummaryResponse {
   message?: string;
 }
 
-export async function chatWithCase(data: ChatRequest): Promise<ChatResponse> {
+export async function chatWithCase(data: ChatRequest, userId: number = 1): Promise<ChatResponse> {
   try {
-    const response = await fetch(`${API_BASE}/chat`, {
+    const response = await fetch(`${API_BASE}/chat?user_id=${userId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -355,9 +355,9 @@ export async function chatWithCase(data: ChatRequest): Promise<ChatResponse> {
   }
 }
 
-export async function getChatHistory(caseId: number): Promise<ChatHistoryResponse> {
+export async function getChatHistory(caseId: number, userId: number = 1): Promise<ChatHistoryResponse> {
   try {
-    const response = await fetch(`${API_BASE}/chat/history/${caseId}`);
+    const response = await fetch(`${API_BASE}/chat/history/${caseId}?user_id=${userId}`);
 
     if (!response.ok) {
       return { success: false, messages: [] };
@@ -374,9 +374,9 @@ export async function getChatHistory(caseId: number): Promise<ChatHistoryRespons
   }
 }
 
-export async function getChatSummary(caseId: number): Promise<ChatSummaryResponse> {
+export async function getChatSummary(caseId: number, userId: number = 1): Promise<ChatSummaryResponse> {
   try {
-    const response = await fetch(`${API_BASE}/chat/summary/${caseId}`);
+    const response = await fetch(`${API_BASE}/chat/summary/${caseId}?user_id=${userId}`);
 
     if (!response.ok) {
       return { success: false, message: "Failed to get summary" };
@@ -393,9 +393,9 @@ export async function getChatSummary(caseId: number): Promise<ChatSummaryRespons
   }
 }
 
-export async function clearChatHistory(caseId: number): Promise<{ success: boolean; message: string }> {
+export async function clearChatHistory(caseId: number, userId: number = 1): Promise<{ success: boolean; message: string }> {
   try {
-    const response = await fetch(`${API_BASE}/chat/history/${caseId}`, {
+    const response = await fetch(`${API_BASE}/chat/history/${caseId}?user_id=${userId}`, {
       method: "DELETE",
     });
 

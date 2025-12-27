@@ -173,3 +173,34 @@ def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Secu
         return get_current_user(credentials)
     except HTTPException:
         return None
+
+
+# ==================== FLEXIBLE AUTH FOR DEVELOPMENT ====================
+from fastapi import Query
+
+async def get_user_id_flexible(
+    user_id: Optional[int] = Query(None, description="User ID for development/testing"),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(optional_security)
+) -> int:
+    """
+    Flexible user_id extraction - works with either:
+    1. JWT Bearer token (production)
+    2. user_id query parameter (development/testing)
+    
+    This allows the frontend to work without full JWT implementation.
+    """
+    # Try JWT first
+    if credentials:
+        try:
+            payload = decode_token(credentials.credentials)
+            return payload["user_id"]
+        except HTTPException:
+            pass
+    
+    # Fallback to query parameter
+    if user_id is not None:
+        return user_id
+    
+    # No auth provided
+    raise HTTPException(status_code=403, detail="Not authenticated")
+

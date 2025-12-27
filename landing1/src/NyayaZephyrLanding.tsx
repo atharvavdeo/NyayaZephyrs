@@ -1,6 +1,8 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Github, Scale, Gavel, History, FileText, Database, Cpu, Search, Upload, Zap, Shield, Globe, Send } from 'lucide-react';
+import { ArrowRight, Github, Scale, Gavel, History, FileText, Database, Cpu, Search, Upload, Zap, Shield, Globe, Send, CheckCircle2, X } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Tetris Background Component
 const TetrisBackground = () => {
@@ -243,10 +245,10 @@ const ArchitectureGrid = () => {
       <div key={box.id} className="relative">
         <div
           className={`relative p-5 rounded-xl transition-all duration-500 ${isActive
-              ? 'bg-[#f5f1e8] border-2 border-[#f97316] shadow-lg scale-[1.03] ring-2 ring-[#f97316]/20'
-              : isPast
-                ? 'bg-[#f5f1e8] border border-[#f97316]/50'
-                : 'bg-[#e8e4db] border border-[#d4b896]/40'
+            ? 'bg-[#f5f1e8] border-2 border-[#f97316] shadow-lg scale-[1.03] ring-2 ring-[#f97316]/20'
+            : isPast
+              ? 'bg-[#f5f1e8] border border-[#f97316]/50'
+              : 'bg-[#e8e4db] border border-[#d4b896]/40'
             }`}
         >
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-all duration-300 ${isActive ? 'bg-[#f97316]/30' : isPast ? 'bg-[#f97316]/15' : 'bg-[#d4b896]/30'
@@ -274,8 +276,8 @@ const ArchitectureGrid = () => {
         {/* Horizontal Arrow to next box */}
         {showArrow && (
           <div className={`absolute top-1/2 -right-3 transform -translate-y-1/2 z-10 transition-all duration-300 ${activeConnection?.from === box.id && activeConnection?.direction === 'right'
-              ? 'opacity-100 scale-110'
-              : 'opacity-30 scale-100'
+            ? 'opacity-100 scale-110'
+            : 'opacity-30 scale-100'
             }`}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <path
@@ -316,8 +318,8 @@ const ArchitectureGrid = () => {
 
         {/* Vertical Arrow from row 1 to row 2 (box 3 to box 4) */}
         <div className={`flex justify-start pl-[16.67%] mb-3 transition-all duration-300 ${activeConnection?.from === 3 && activeConnection?.to === 4
-            ? 'opacity-100'
-            : 'opacity-30'
+          ? 'opacity-100'
+          : 'opacity-30'
           }`}>
           <div className="flex flex-col items-center">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className={activeConnection?.from === 3 ? 'animate-bounce' : ''}>
@@ -515,6 +517,23 @@ const SandboxSection = () => {
 // Newsletter Section Component
 const NewsletterSection = () => {
   const [email, setEmail] = useState('');
+  const [showPopup, setShowPopup] = useState(false);
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+
+    // Trigger celebration
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#f97316', '#1a1a1a', '#8b7355', '#ffffff']
+    });
+
+    setShowPopup(true);
+    setEmail('');
+  };
 
   return (
     <section className="py-24 bg-gradient-to-br from-[#f97316]/10 to-[#d4b896]/20 relative">
@@ -529,19 +548,76 @@ const NewsletterSection = () => {
           Get early access to new features, legal AI insights, and exclusive updates
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
+        <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Enter your email"
             className="w-full px-6 py-4 bg-white border-2 border-[#d4b896] text-[#1a1a1a] placeholder-[#8b7355]/50 focus:outline-none focus:border-[#f97316] transition-colors"
+            required
           />
-          <button className="w-full sm:w-auto px-8 py-4 bg-[#f97316] text-white font-black uppercase tracking-[0.2em] text-sm hover:bg-[#ea580c] transition-all whitespace-nowrap">
+          <button
+            type="submit"
+            className="w-full sm:w-auto px-8 py-4 bg-[#f97316] text-white font-black uppercase tracking-[0.2em] text-sm hover:bg-[#ea580c] transition-all whitespace-nowrap"
+          >
             Subscribe
           </button>
-        </div>
+        </form>
       </div>
+
+      {/* Success Popup */}
+      <AnimatePresence>
+        {showPopup && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-6 pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#1a1a1a]/40 backdrop-blur-sm pointer-events-auto"
+              onClick={() => setShowPopup(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-[#f5f1e8] border-2 border-[#f97316] p-8 shadow-[0_20px_50px_rgba(249,115,22,0.3)] pointer-events-auto"
+            >
+              <button
+                onClick={() => setShowPopup(false)}
+                className="absolute top-4 right-4 text-[#8b7355] hover:text-[#f97316] transition-colors"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-[#f97316]/10 rounded-full flex items-center justify-center mb-6">
+                  <CheckCircle2 size={32} className="text-[#f97316]" />
+                </div>
+
+                <h3 className="text-2xl font-serif font-black text-[#1a1a1a] uppercase mb-4 tracking-tight">
+                  You're <span className="text-[#f97316] italic">In!</span>
+                </h3>
+
+                <p className="text-[#8b7355] font-medium leading-relaxed mb-8">
+                  Thank you for subscribing! <br />
+                  Keep an eye on <span className="text-[#1a1a1a] font-bold">your mailbox</span> for the latest in AI Law.
+                </p>
+
+                <button
+                  onClick={() => setShowPopup(false)}
+                  className="w-full py-4 bg-[#1a1a1a] text-white font-black uppercase tracking-[0.2em] text-sm hover:bg-[#2a2a2a] transition-all shadow-lg"
+                >
+                  Close
+                </button>
+              </div>
+
+              {/* Decorative side bar */}
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#f97316]"></div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </section>
   );
 };

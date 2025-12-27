@@ -108,16 +108,17 @@ class SecureChatbot:
             response = completion.choices[0].message.content
             
                                   
-            is_safe, failure_reason = validate_output(response)
-            if not is_safe:
-                logger.warning(f"Output validation failed: {failure_reason}")
-                return f"⚠️ Parameters of the response were unsafe: {failure_reason}"
+            filtered_response, output_warnings, is_blocked = validate_output(response)
+            if is_blocked:
+                logger.warning(f"Output validation blocked: {output_warnings}")
+                return f"⚠️ Response was blocked due to safety concerns."
             
-                                                                            
-            fact_check_result = verify_citations(response, case_data)
-            final_response = response
-            if fact_check_result["warning"]:
-                final_response += f"\n\n⚠️ **Hallucination Warning:** {fact_check_result['warning']}"
+            # Verify citations (hallucination check)
+            verified_response, citation_warnings = verify_citations(filtered_response, self.db, case_id)
+            final_response = verified_response
+            if citation_warnings:
+                for warning in citation_warnings:
+                    logger.warning(f"Hallucination check: {warning}")
             
                                                                                        
             self.db.add_chat_log(user_id, case_id, "user", sanitized_query)

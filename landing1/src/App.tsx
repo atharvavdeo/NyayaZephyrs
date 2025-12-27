@@ -9,6 +9,7 @@ import AdminDashboard from "./AdminDashboard";
 import { LanguageProvider, useLanguage } from "./LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { getUserCases, type CaseDetails } from "./api/legalResearcher";
+import { useTheme, getThemeColors } from "./ThemeContext";
 
 interface Block {
   id: number;
@@ -471,9 +472,9 @@ function TopNavbar({ activePage, onNavigate }: { activePage: "dashboard" | "docu
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-[#f97316] rounded flex items-center justify-center">
-              <span className="text-white font-bold text-lg">M</span>
+              <span className="text-white font-bold text-lg">N</span>
             </div>
-            <span className="text-[18px] font-bold text-[#1a1a1a] hidden sm:block" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>ZEPHYRS AI</span>
+            <span className="text-[18px] font-bold text-[#1a1a1a] hidden sm:block" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>NYAYAZEPHYR</span>
           </div>
 
           {/* Desktop Navigation */}
@@ -505,9 +506,9 @@ function TopNavbar({ activePage, onNavigate }: { activePage: "dashboard" | "docu
 
             {/* User Profile */}
             <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[#d4cdb8]">
-              <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">JD</div>
+              <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">L1</div>
               <div className="hidden lg:block">
-                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>John Doe</p>
+                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>Lawyer1</p>
               </div>
             </div>
 
@@ -554,8 +555,8 @@ function TopNavbar({ activePage, onNavigate }: { activePage: "dashboard" | "docu
             <div className="mt-3 pt-3 border-t border-[#d4cdb8] flex items-center justify-between">
               <LanguageSelector />
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">JD</div>
-                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>John Doe</p>
+                <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">L1</div>
+                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>Lawyer1</p>
               </div>
             </div>
           </div>
@@ -602,14 +603,21 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     }
   };
 
-  // Fetch documents from database on mount
+  // Fetch documents (cases) from database on mount
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const response = await fetch("http://localhost:8000/legal/documents?user_id=1");
+        const response = await fetch("http://localhost:8000/legal/cases?user_id=1");
         if (response.ok) {
           const data = await response.json();
-          setDbDocuments(data.documents || []);
+          // Transform cases to document format for display
+          const docs = (data.cases || []).map((c: any) => ({
+            file_hash: c.case_id,
+            filename: c.client_name || "Case Document",
+            case_title: c.client_name + (c.structured_data?.opposing_party ? ` vs ${c.structured_data?.opposing_party}` : ""),
+            upload_date: c.created_at
+          }));
+          setDbDocuments(docs);
         }
       } catch (error) {
         console.error("Failed to fetch documents:", error);
@@ -624,41 +632,43 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
   const handleLoadDocument = async (doc: any) => {
     setProcessing(true);
     try {
-      // Fetch document metadata from the metadata endpoint
-      let metaResponse = await fetch(`http://localhost:8000/legal/documents/${doc.file_hash}/metadata`);
-      if (metaResponse.ok) {
-        let metaData = await metaResponse.json();
-        console.log("Received metadata:", metaData);
-        console.log("Setting metadata.metadata:", metaData.metadata);
+      // doc.file_hash is actually case_id from our transformation
+      const caseId = doc.file_hash;
 
-        // Use cached metadata from database (no auto-reanalysis)
-        // User can manually trigger re-analysis using the Analyze button if needed
+      // Fetch case details from the cases endpoint
+      const caseResponse = await fetch(`http://localhost:8000/legal/cases/${caseId}?user_id=1`);
+      if (caseResponse.ok) {
+        const caseData = await caseResponse.json();
+        console.log("Loaded case data:", caseData);
 
-        setSessionId(doc.file_hash);
-        setMetadata(metaData.metadata);
-        console.log("Metadata state updated");
-
-        // Set file preview URL if file exists in data folder
-        setFileUrl(`http://localhost:8000/legal/documents/${doc.file_hash}/file`);
+        setSessionId(String(caseId));
+        setMetadata(caseData.structured_data || {});
+        setFileUrl(null); // No file preview for case-based documents
 
         // Fetch chat history
-        const historyResponse = await fetch(`http://localhost:8000/legal/documents/${doc.file_hash}/history`);
+        const historyResponse = await fetch(`http://localhost:8000/legal/chat/history/${caseId}?user_id=1`);
         if (historyResponse.ok) {
           const historyData = await historyResponse.json();
-          const chatMessages = historyData.messages?.map((msg: any) => ({
+          const chatMessages = (historyData.messages || []).map((msg: any) => ({
             role: msg.role === "assistant" ? "ai" : msg.role,
             content: msg.content
-          })) || [];
+          }));
 
           // Set initial message if no chat history
           if (chatMessages.length === 0) {
             setMessages([
-              { role: "ai", content: `[DOC] **Loaded: ${doc.filename}**\n\n[CHAT] You can now ask questions about this document.` }
+              { role: "ai", content: `📁 **Loaded: ${doc.filename}**\n\nYou can now ask questions about this case.` }
             ]);
           } else {
             setMessages(chatMessages);
           }
+        } else {
+          setMessages([
+            { role: "ai", content: `📁 **Loaded: ${doc.filename}**\n\nYou can now ask questions about this case.` }
+          ]);
         }
+      } else {
+        throw new Error("Failed to load case");
       }
     } catch (error) {
       console.error("Failed to load document:", error);
@@ -686,10 +696,9 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("user_id", "1"); // Default user_id
 
     try {
-      const response = await fetch("http://localhost:8000/legal/cases/pdf-upload", {
+      const response = await fetch("http://localhost:8000/legal/cases/pdf-upload?user_id=1", {
         method: "POST",
         body: formData,
       });
@@ -745,7 +754,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
     setMessages(prev => [...prev, { role: "user", content: userText }]);
 
     try {
-      const response = await fetch("http://localhost:8000/legal/chat", {
+      const response = await fetch("http://localhost:8000/legal/chat?user_id=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ case_id: parseInt(sessionId), query: userText, language: "en" })
@@ -1115,6 +1124,8 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 // Dashboard Page Component
 function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher" | "admin") => void }) {
   const { t } = useLanguage();
+  const { isDark } = useTheme();
+  const colors = getThemeColors(isDark);
   const [blocks] = useState<Block[]>(() => generateRandomBlocks(12));
   const [dashboardStats, setDashboardStats] = useState({
     documents_analyzed: 0,
@@ -1213,14 +1224,14 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
+    <div className="relative min-h-screen w-full overflow-hidden flex" style={{ backgroundColor: colors.bg }}>
       {/* Grid Pattern */}
       <div
         className="absolute inset-0 z-0"
         style={{
           backgroundImage: `
-            linear-gradient(to right, rgba(139, 115, 85, 0.15) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(139, 115, 85, 0.15) 1px, transparent 1px)
+            linear-gradient(to right, ${colors.grid} 1px, transparent 1px),
+            linear-gradient(to bottom, ${colors.grid} 1px, transparent 1px)
           `,
           backgroundSize: "40px 40px",
         }}
@@ -1231,8 +1242,8 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
         className="absolute inset-0 z-[1]"
         style={{
           background: `
-            radial-gradient(circle at 20% 30%, rgba(245, 222, 179, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 80% 70%, rgba(222, 184, 135, 0.2) 0%, transparent 50%)
+            radial-gradient(circle at 20% 30%, ${colors.gradient1} 0%, transparent 50%),
+            radial-gradient(circle at 80% 70%, ${colors.gradient2} 0%, transparent 50%)
           `,
         }}
       />
@@ -1388,7 +1399,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               </div>
             </motion.div>
 
-            {/* Calendar Timeline */}
+            {/* Calendar with Mini Month View */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1396,20 +1407,81 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               transition={{ duration: 0.5, delay: 0.8 }}
               className="bg-[#d4c4a8] backdrop-blur-sm rounded-xl p-6 shadow-lg cursor-pointer"
             >
-              <div className="flex items-center gap-2 mb-3">
-                <svg className="w-5 h-5 text-[#6b5744]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <h3 className="text-[14px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>CALENDAR</h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-[#6b5744]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <h3 className="text-[14px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>CALENDAR</h3>
+                </div>
+                <span className="text-[12px] text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
               </div>
-              <div className="space-y-2 max-h-[120px] overflow-y-auto">
-                {calendarEventsData.map((event: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2 text-[13px]" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                    <span className={event.upcoming ? "text-[#f97316]" : "text-[#999]"}>{event.upcoming ? ">" : "-"}</span>
-                    <span className="text-[#666]">{event.date}</span>
-                    <span className="text-[#1a1a1a]">{event.event} - Case {event.caseId}</span>
-                  </div>
-                ))}
+
+              {/* Mini Calendar Grid */}
+              <div className="mb-3">
+                <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                    <span key={i} className="text-[10px] text-[#666] font-medium">{day}</span>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {(() => {
+                    const today = new Date();
+                    const currentMonth = today.getMonth();
+                    const currentYear = today.getFullYear();
+                    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+                    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                    const todayDate = today.getDate();
+
+                    // Get event dates from cases
+                    const eventDates = calendarEventsData.map(e => {
+                      const parts = e.date.split(' ');
+                      return parseInt(parts[1]) || 0;
+                    });
+
+                    const days = [];
+                    // Empty cells for days before first of month
+                    for (let i = 0; i < firstDay; i++) {
+                      days.push(<div key={`empty-${i}`} className="w-5 h-5"></div>);
+                    }
+                    // Actual days
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      const isToday = d === todayDate;
+                      const hasEvent = eventDates.includes(d);
+                      days.push(
+                        <div
+                          key={d}
+                          className={`w-5 h-5 flex items-center justify-center text-[10px] rounded-full cursor-pointer transition-all hover:bg-[#f97316] hover:text-white ${isToday ? 'bg-[#f97316] text-white font-bold' :
+                            hasEvent ? 'bg-[#f5f1e8] text-[#f97316] font-bold ring-2 ring-[#f97316]/50' :
+                              'text-[#1a1a1a]'
+                            }`}
+                          title={hasEvent ? "Has event" : ""}
+                        >
+                          {d}
+                        </div>
+                      );
+                    }
+                    return days;
+                  })()}
+                </div>
+              </div>
+
+              {/* Upcoming Events List */}
+              <div className="space-y-1.5 max-h-[80px] overflow-y-auto border-t border-[#c4b498] pt-2">
+                {calendarEventsData.length > 0 ? (
+                  calendarEventsData.map((event: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 text-[11px] p-1.5 rounded-md bg-[#f5f1e8]/70 hover:bg-[#f5f1e8] transition-colors" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                      <span className={`w-2 h-2 rounded-full ${event.upcoming ? "bg-[#f97316]" : "bg-[#999]"}`}></span>
+                      <span className="text-[#666] min-w-[50px]">{event.date}</span>
+                      <span className="text-[#1a1a1a] font-medium">{event.event}</span>
+                      <span className="text-[#f97316]">{event.caseId}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-[11px] text-[#666] text-center">No upcoming events</p>
+                )}
               </div>
             </motion.div>
           </div>
@@ -2282,13 +2354,218 @@ function LandingPage({ onMeetCustomers, onDashboard }: { onMeetCustomers: () => 
 
 // Settings Page Component
 function SettingsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "documents" | "settings" | "clients" | "legal-researcher") => void }) {
+  const { isDark, toggleTheme } = useTheme();
+  const colors = getThemeColors(isDark);
+
+  const [userProfile, setUserProfile] = useState({
+    name: "Lawyer1",
+    email: "lawyer1@legalpractice.com",
+    phone: "+91 98765 43210",
+    barNumber: "BAR/2024/12345",
+    specialization: "Constitutional & Criminal Law",
+    firm: "Legal Associates LLP"
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [preferences, setPreferences] = useState({
+    emailNotifications: true,
+    caseReminders: true,
+    autoSave: true
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#f5f1e8] flex">
+    <div className="relative min-h-screen w-full overflow-hidden flex" style={{ backgroundColor: colors.bg }}>
       <TopNavbar activePage="settings" onNavigate={onNavigate} />
-      <div className="flex-1 relative z-10 pt-20 p-8 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-[32px] font-normal text-[#1a1a1a] mb-4" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>Settings</h1>
-          <p className="text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>User profile and preferences management coming soon.</p>
+      <div className="flex-1 relative z-10 pt-20 p-8">
+        <div className="max-w-4xl mx-auto">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-[32px] font-normal text-[#1a1a1a] mb-8"
+            style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}
+          >
+            Settings
+          </motion.h1>
+
+          {/* User Profile Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-[#d4b896]/50 mb-6"
+          >
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-16 h-16 bg-[#f97316] rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                {userProfile.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h2 className="text-[20px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>
+                  User Profile
+                </h2>
+                <p className="text-[14px] text-[#666]" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Manage your personal information
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[13px] font-medium text-[#666] mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={userProfile.name}
+                  onChange={(e) => setUserProfile({ ...userProfile, name: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-[#d4b896] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f97316] text-[#1a1a1a]"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#666] mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={userProfile.email}
+                  onChange={(e) => setUserProfile({ ...userProfile, email: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-[#d4b896] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f97316] text-[#1a1a1a]"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#666] mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={userProfile.phone}
+                  onChange={(e) => setUserProfile({ ...userProfile, phone: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-[#d4b896] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f97316] text-[#1a1a1a]"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#666] mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Bar Council Number
+                </label>
+                <input
+                  type="text"
+                  value={userProfile.barNumber}
+                  onChange={(e) => setUserProfile({ ...userProfile, barNumber: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-[#d4b896] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f97316] text-[#1a1a1a]"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#666] mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Specialization
+                </label>
+                <input
+                  type="text"
+                  value={userProfile.specialization}
+                  onChange={(e) => setUserProfile({ ...userProfile, specialization: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-[#d4b896] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f97316] text-[#1a1a1a]"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#666] mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Law Firm
+                </label>
+                <input
+                  type="text"
+                  value={userProfile.firm}
+                  onChange={(e) => setUserProfile({ ...userProfile, firm: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-[#d4b896] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f97316] text-[#1a1a1a]"
+                  style={{ fontFamily: "Montserrat, sans-serif" }}
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Preferences Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-[#d4b896]/50 mb-6"
+          >
+            <h2 className="text-[20px] font-semibold mb-4" style={{ fontFamily: "'Times New Roman', Georgia, serif", color: colors.text }}>
+              Preferences
+            </h2>
+            <div className="space-y-4">
+              {/* Dark Mode Toggle - Separate and wired to ThemeContext */}
+              <div className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)' }}>
+                <div>
+                  <p className="text-[14px] font-medium" style={{ fontFamily: "Montserrat, sans-serif", color: colors.text }}>Dark Mode</p>
+                  <p className="text-[12px]" style={{ fontFamily: "Montserrat, sans-serif", color: colors.textSecondary }}>Toggle dark theme for the entire app</p>
+                </div>
+                <button
+                  onClick={toggleTheme}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${isDark ? 'bg-[#f97316]' : 'bg-[#d4c4a8]'}`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${isDark ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {/* Other preferences */}
+              {[
+                { key: 'emailNotifications', label: 'Email Notifications', desc: 'Receive email updates about your cases' },
+                { key: 'caseReminders', label: 'Case Reminders', desc: 'Get reminders for upcoming hearings and deadlines' },
+                { key: 'autoSave', label: 'Auto-save', desc: 'Automatically save work in progress' }
+              ].map((pref) => (
+                <div key={pref.key} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)' }}>
+                  <div>
+                    <p className="text-[14px] font-medium" style={{ fontFamily: "Montserrat, sans-serif", color: colors.text }}>{pref.label}</p>
+                    <p className="text-[12px]" style={{ fontFamily: "Montserrat, sans-serif", color: colors.textSecondary }}>{pref.desc}</p>
+                  </div>
+                  <button
+                    onClick={() => setPreferences({ ...preferences, [pref.key]: !preferences[pref.key as keyof typeof preferences] })}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${preferences[pref.key as keyof typeof preferences] ? 'bg-[#f97316]' : 'bg-[#d4c4a8]'}`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${preferences[pref.key as keyof typeof preferences] ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Save Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex justify-end gap-3"
+          >
+            <button
+              onClick={() => onNavigate("dashboard")}
+              className="px-6 py-2.5 bg-[#e5ddd0] text-[#666] rounded-lg hover:bg-[#d4c4a8] transition-colors font-medium"
+              style={{ fontFamily: "Montserrat, sans-serif" }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={`px-6 py-2.5 rounded-lg font-medium transition-all ${saved ? 'bg-green-500 text-white' :
+                saving ? 'bg-[#f97316]/70 text-white' :
+                  'bg-[#f97316] text-white hover:bg-[#ea580c]'
+                }`}
+              style={{ fontFamily: "Montserrat, sans-serif" }}
+            >
+              {saved ? '✓ Saved!' : saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </motion.div>
         </div>
       </div>
     </div>
