@@ -212,7 +212,15 @@ class ProgressUpdateRequest(BaseModel):
     progress: int = Field(..., ge=0, le=100, description="Progress percentage 0-100")
     stage: str = Field(..., description="Current stage: filing, trial, appeal, complete, etc.")
 
-                     
+class ImportKanoonDocumentRequest(BaseModel):
+    """Request model for importing Kanoon doc"""
+    case_id: int
+    url: str
+    title: str
+
+class SearchKanoonRequest(BaseModel):
+    query: str
+
 class ChatRequest(BaseModel):
     case_id: int
     query: str = Field(..., min_length=1)
@@ -459,14 +467,14 @@ async def create_case_manual(case_data: ManualCaseCreate, user_id: int = Query(.
     print(f"Creating manual case for user {user_id}")
     
                                                                                                  
-    case_id = db.create_case(user_id, case_data.client_name, raw_description=case_data.case_details, structured_data=structured_json)
+    case_id = db.create_case(user_id, case_data.client_name, raw_description=case_data.legal_issue_summary, structured_data=structured_json)
     case = db.get_case(user_id, case_id)
     
     return CaseResponse(
         case_id=case_id,
         client_name=case_data.client_name,
         structured_data=structured_data,
-        raw_description=case_data.case_details,
+        raw_description=case_data.legal_issue_summary,
         created_at=str(case['created_at'])
     )
 
@@ -578,6 +586,113 @@ async def create_case_from_pdf(
                            
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+
+@router.post("/cases/import-kanoon")
+async def import_kanoon_document(
+    request: ImportKanoonDocumentRequest,
+    user_id: int = Query(..., description="User ID (optional for now, or from context)")
+):
+    """
+    Import a document from Indian Kanoon directly into a case.
+    Fetches full text/markdown and saves it.
+    """
+    db = get_db_manager()
+    
+    # 1. Verify case exists
+    case = db.get_case(user_id, request.case_id)
+    if not case:
+         raise HTTPException(status_code=404, detail="Case not found")
+         
+    researcher = get_legal_researcher()
+    try:
+        # 2. Fetch document content
+        print(f"Importing Kanoon doc: {request.url}")
+        results = researcher.get_case_details([request.url])
+        if not results:
+             raise HTTPException(status_code=500, detail="Failed to fetch document content")
+             
+        url, doc = results[0]
+        markdown = doc.markdown if hasattr(doc, 'markdown') else str(doc)
+        
+        if not markdown or len(markdown) < 50:
+             raise HTTPException(status_code=500, detail="Document content is empty or invalid")
+             
+        # 3. Save to documents
+        # Sanitize filename
+        clean_title = "".join(c for c in request.title if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
+        if not clean_title:
+            clean_title = "kanoon_doc"
+        filename = f"{clean_title}.md"
+        
+        # Check if already exists (optional, simply add unique suffix if needed, but for now overwrite or duplicate)
+        # add_document handles DB insert.
+        
+        doc_id = db.add_document(user_id, request.case_id, filename, markdown)
+        
+        return {"success": True, "document_id": doc_id, "message": "Document imported successfully"}
+        
+    except Exception as e:
+        print(f"Import failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
+
+@router.get("/cases/{case_id}/research-history")
+async def get_case_research_history(case_id: int, user_id: int = Query(...)):
+    """Get research history for a case"""
+    db = get_db_router()
+    history = db.get_search_history(user_id, case_id=case_id, search_type="comprehensive")
+    
+    # Parse results json
+    results = []
+    for item in history:
+        res_data = None
+        if item["results_json"]:
+            try:
+                res_data = json.loads(item["results_json"])
+            except:
+                pass
+        
+        results.append({
+            "search_id": item["search_id"],
+            "query": item["query"],
+            "timestamp": item["timestamp"],
+            "results": res_data
+        })
+        
+    return {"success": True, "history": results}
+
+@router.post("/cases/search-kanoon")
+async def search_kanoon(request: SearchKanoonRequest):
+    """
+    Search Indian Kanoon for documents.
+    Returns a list of potential matches with titles (fetched via scraping).
+    """
+    researcher = get_legal_researcher()
+    try:
+        # 1. Get URLs
+        urls = researcher.find_relevant_cases(request.query)
+        if not urls:
+             return {"results": []}
+        
+        # 2. Fetch details (limit to 3 for speed)
+        raw_cases = researcher.get_case_details(urls[:3])
+        
+        results = []
+        for url, doc in raw_cases:
+             md = doc.markdown if hasattr(doc, 'markdown') else ''
+             info = researcher.extract_case_info(md, url)
+             results.append({
+                 "url": url, 
+                 "title": info.get("case_title", "Unknown Case"),
+                 "date": info.get("date", ""),
+                 "court": info.get("court", "")
+             })
+             
+        return {"results": results}
+    except Exception as e:
+        print(f"Search failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
 @router.get("/cases", response_model=CaseListResponse)
@@ -1187,8 +1302,32 @@ def create_standalone_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-                        
+    # Include main legal router
     app.include_router(router)
+    
+    # Include multi-source research router (eCourts, IndiaCode, GovInfo, UK Case Law)
+    try:
+        from api_international import router as international_router
+        app.include_router(international_router)
+        print("✅ Multi-source research endpoints loaded")
+    except Exception as e:
+        print(f"⚠️ Could not load international research endpoints: {e}")
+    
+    # Include evidence analysis router (Gemini Vision)
+    try:
+        from api_evidence import router as evidence_router
+        app.include_router(evidence_router)
+        print("✅ Evidence analysis endpoints loaded")
+    except Exception as e:
+        print(f"⚠️ Could not load evidence endpoints: {e}")
+
+    # Include drafting assistant router
+    try:
+        from api_drafting import router as drafting_router
+        app.include_router(drafting_router, prefix="/legal/draft", tags=["Drafting Assistant"])
+        print("✅ Drafting assistant endpoints loaded")
+    except Exception as e:
+        print(f"⚠️ Could not load drafting endpoints: {e}")
     
     @app.get("/")
     async def root():

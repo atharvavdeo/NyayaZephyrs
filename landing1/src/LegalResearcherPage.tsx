@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "./LanguageContext";
+import MultiSourceResearchPanel from "./MultiSourceResearchPanel";
+import EvidencePanel from "./EvidencePanel";
+import ActsAnalysisPanel from "./ActsAnalysisPanel";
+import EvidenceGallery from "./EvidenceGallery";
+import DraftingAssistant from "./DraftingAssistant";
 import {
   getUserCases,
   createCaseManual,
@@ -14,10 +19,16 @@ import {
   conductResearch,
   exportCasePDF,
   getUserStats,
+
   updateCaseProgress,
+  searchKanoon,
+  importKanoonDocument,
+  uploadEvidence,
+  getCaseResearchHistory,
   type CaseDetails,
   type ChatMessage,
   type ResearchResult,
+  type KanoonSearchResult,
 } from "./api/legalResearcher";
 
 // ==================== CREATE CASE MODAL ====================
@@ -49,6 +60,9 @@ function CreateCaseModal({ onClose, onCaseCreated }: CreateCaseModalProps) {
   // PDF upload
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
+  // Evidence upload
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim()) {
@@ -69,6 +83,14 @@ function CreateCaseModal({ onClose, onCaseCreated }: CreateCaseModalProps) {
         recommended_actions: recommendedActions ? recommendedActions.split('\n').filter(a => a.trim()) : undefined,
       });
       if (res.success) {
+        if (evidenceFile && res.case_id) {
+          try {
+            await uploadEvidence(res.case_id, evidenceFile, "Initial Evidence from creation", DEFAULT_USER_ID);
+          } catch (e) {
+            console.error("Failed to upload evidence during creation", e);
+            // Verify if we should alert user? Maybe just log.
+          }
+        }
         onCaseCreated();
         onClose();
       } else {
@@ -241,6 +263,15 @@ function CreateCaseModal({ onClose, onCaseCreated }: CreateCaseModalProps) {
                   />
                 </div>
                 <div className="col-span-2">
+                  <label className="block text-sm font-medium text-[#1a1a1a] mb-1">Upload Evidence (Initial)</label>
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
+                    className="w-full text-sm text-[#666] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[#e5ddd0] file:text-[#5d4037] hover:file:bg-[#d4b896]"
+                  />
+                </div>
+                <div className="col-span-2">
                   <label className="block text-sm font-medium text-[#1a1a1a] mb-1">Applicable Laws (one per line)</label>
                   <textarea
                     value={applicableLaws}
@@ -361,9 +392,10 @@ interface CaseDetailProps {
   caseData: CaseDetails;
   onBack: () => void;
   onDelete: (id: number) => void;
+  onRefresh?: () => void;
 }
 
-function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
+function CaseDetailView({ caseData, onBack, onDelete, onRefresh }: CaseDetailProps) {
   const { language } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -371,6 +403,9 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [summary, setSummary] = useState<string | null>(null);
   const [showResearch, setShowResearch] = useState(false);
+  const [showMultiSource, setShowMultiSource] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
+  const [showActs, setShowActs] = useState(false);
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
   const [researching, setResearching] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -381,10 +416,65 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
   const [savingProgress, setSavingProgress] = useState(false);
   const [progressSaved, setProgressSaved] = useState(false);
 
+  // Doc Search State
+  const [showDocSearch, setShowDocSearch] = useState(false);
+  const [docSearchQuery, setDocSearchQuery] = useState("");
+  const [docSearchResults, setDocSearchResults] = useState<KanoonSearchResult[]>([]);
+  const [searchingDocs, setSearchingDocs] = useState(false);
+  const [importingDoc, setImportingDoc] = useState(false);
+
+  const handleDocSearch = async () => {
+    if (!docSearchQuery.trim()) return;
+    setSearchingDocs(true);
+    setDocSearchResults([]);
+    try {
+      const res = await searchKanoon(docSearchQuery);
+      setDocSearchResults(res.results);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSearchingDocs(false);
+    }
+  };
+
+  const handleImportDoc = async (res: KanoonSearchResult) => {
+    setImportingDoc(true);
+    try {
+      await importKanoonDocument(caseData.case_id, res.url, res.title);
+      alert("Document successfully imported!");
+      setShowDocSearch(false);
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      alert("Failed to import document.");
+      console.error(e);
+    } finally {
+      setImportingDoc(false);
+    }
+  };
+
   useEffect(() => {
     loadChatHistory();
     loadSummary();
+    loadResearchHistory();
   }, [caseData.case_id]);
+
+  const loadResearchHistory = async () => {
+    try {
+      const res = await getCaseResearchHistory(caseData.case_id, DEFAULT_USER_ID);
+      if (res.success && res.history && res.history.length > 0) {
+        const latest = res.history[0];
+        if (latest.results) {
+          setResearchResult(latest.results);
+        }
+      } else {
+        // No history, run initial research
+        if (!researchResult) handleResearch();
+      }
+    } catch (e) {
+      console.error("Failed to load research history", e);
+      if (!researchResult) handleResearch();
+    }
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -499,10 +589,28 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
         </button>
         <div className="flex gap-2">
           <button
-            onClick={() => { setShowResearch(!showResearch); if (!showResearch && !researchResult) handleResearch(); }}
+            onClick={() => { setShowResearch(!showResearch); setShowMultiSource(false); setShowEvidence(false); setShowActs(false); if (!showResearch && !researchResult) handleResearch(); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showResearch ? "bg-[#f97316] text-white" : "bg-[#e5ddd0] text-[#666] hover:bg-[#d4c4a8]"}`}
           >
-            🔍 Research
+            🔍 Indian Cases
+          </button>
+          <button
+            onClick={() => { setShowMultiSource(!showMultiSource); setShowResearch(false); setShowEvidence(false); setShowActs(false); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showMultiSource ? "bg-[#1a3a5c] text-white" : "bg-[#e5ddd0] text-[#666] hover:bg-[#d4c4a8]"}`}
+          >
+            🌐 US Cases
+          </button>
+          <button
+            onClick={() => { setShowActs(!showActs); setShowResearch(false); setShowMultiSource(false); setShowEvidence(false); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showActs ? "bg-[#5d4037] text-white" : "bg-[#e5ddd0] text-[#666] hover:bg-[#d4c4a8]"}`}
+          >
+            📜 Acts
+          </button>
+          <button
+            onClick={() => { setShowEvidence(!showEvidence); setShowResearch(false); setShowMultiSource(false); setShowActs(false); }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showEvidence ? "bg-purple-600 text-white" : "bg-[#e5ddd0] text-[#666] hover:bg-[#d4c4a8]"}`}
+          >
+            🔬 Evidence
           </button>
           <button onClick={handleExport} className="px-4 py-2 bg-[#e5ddd0] text-[#666] hover:bg-[#d4c4a8] rounded-lg text-sm font-medium transition-colors">
             📄 Export PDF
@@ -602,10 +710,10 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
                 onClick={handleSaveProgress}
                 disabled={savingProgress}
                 className={`w-full py-2 rounded-lg text-sm font-medium transition-all ${progressSaved
-                    ? "bg-green-500 text-white"
-                    : savingProgress
-                      ? "bg-[#d4c4a8] text-[#666] cursor-wait"
-                      : "bg-[#f97316] text-white hover:bg-[#ea580c]"
+                  ? "bg-green-500 text-white"
+                  : savingProgress
+                    ? "bg-[#d4c4a8] text-[#666] cursor-wait"
+                    : "bg-[#f97316] text-white hover:bg-[#ea580c]"
                   }`}
               >
                 {progressSaved ? "✓ Saved!" : savingProgress ? "Saving..." : "Save Progress"}
@@ -664,11 +772,69 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
               </>
             )}
 
-            {caseData.documents && caseData.documents.length > 0 && (
+            {(
               <>
                 <hr className="border-[#d4b896]/50" />
-                <div>
-                  <span className="text-[#666] block mb-2">Documents ({caseData.documents.length})</span>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[#666]">Documents ({caseData.documents?.length || 0})</span>
+                  <button
+                    onClick={() => setShowDocSearch(true)}
+                    className="text-xs bg-[#e5ddd0] hover:bg-[#d4b896] text-[#5d4037] px-2 py-1 rounded transition-colors flex items-center gap-1"
+                  >
+                    <span>+</span> Add Judgement
+                  </button>
+                </div>
+
+                {/* Search Modal */}
+                {showDocSearch && (
+                  <div className="mb-4 bg-white p-3 rounded-lg border border-[#d4b896] shadow-sm">
+                    <div className="flex gap-2 mb-3">
+                      <input
+                        type="text"
+                        value={docSearchQuery}
+                        onChange={(e) => setDocSearchQuery(e.target.value)}
+                        placeholder="Search by party name, citation, or act..."
+                        className="flex-1 px-3 py-1.5 text-sm border border-[#e5ddd0] rounded focus:outline-none focus:border-[#d4b896]"
+                        onKeyDown={(e) => e.key === 'Enter' && handleDocSearch()}
+                      />
+                      <button
+                        onClick={handleDocSearch}
+                        disabled={searchingDocs}
+                        className="px-3 py-1.5 bg-[#5d4037] text-white text-sm rounded hover:bg-[#4a332d] disabled:opacity-50"
+                      >
+                        {searchingDocs ? "..." : "Search"}
+                      </button>
+                      <button onClick={() => setShowDocSearch(false)} className="text-[#888] hover:text-[#555]">
+                        ✕
+                      </button>
+                    </div>
+
+                    {docSearchResults.length > 0 && (
+                      <ul className="max-h-40 overflow-y-auto space-y-2 border-t border-[#f0f0f0] pt-2">
+                        {docSearchResults.map((res, idx) => (
+                          <li key={idx} className="flex justify-between items-start text-xs p-2 hover:bg-[#faf9f6] rounded">
+                            <div>
+                              <div className="font-medium text-[#333]">{res.title}</div>
+                              <div className="text-[#888]">{res.court} • {res.date}</div>
+                            </div>
+                            <button
+                              onClick={() => handleImportDoc(res)}
+                              disabled={importingDoc}
+                              className="ml-2 text-[#f97316] hover:text-[#c2410c] font-medium disabled:opacity-50"
+                            >
+                              Import
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {docSearchResults.length === 0 && !searchingDocs && docSearchQuery && (
+                      <div className="text-xs text-[#888] text-center py-2">No results found.</div>
+                    )}
+                  </div>
+                )}
+
+                {caseData.documents && (
                   <ul className="space-y-1">
                     {caseData.documents.map((doc, idx) => (
                       <li key={idx} className="text-[#1a1a1a] text-sm flex items-center gap-2">
@@ -679,7 +845,7 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
                       </li>
                     ))}
                   </ul>
-                </div>
+                )}
               </>
             )}
 
@@ -695,9 +861,39 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
           </div>
         </div>
 
-        {/* Chat / Research Panel */}
+        {/* Chat / Research / Evidence / Acts Panel */}
         <div className="lg:col-span-2 flex flex-col bg-white/50 rounded-xl border border-[#d4b896]/30 overflow-hidden">
-          {showResearch ? (
+          {showActs ? (
+            // Acts Analysis Panel
+            <div className="p-4 h-full overflow-y-auto">
+              <ActsAnalysisPanel
+                caseId={caseData.case_id}
+                caseType={caseData.case_type || "general"}
+                caseDescription={caseData.legal_issue_summary || caseData.raw_description || ""}
+                clientName={caseData.client_name}
+                onClose={() => setShowActs(false)}
+              />
+            </div>
+          ) : showEvidence ? (
+            // Evidence Panel
+            <div className="p-4 h-full overflow-y-auto">
+              <EvidencePanel
+                caseId={caseData.case_id}
+                userId={DEFAULT_USER_ID}
+                caseType={caseData.case_type || "general"}
+                onClose={() => setShowEvidence(false)}
+              />
+            </div>
+          ) : showMultiSource ? (
+            // Multi-Source Research Panel (US/UK/Acts)
+            <div className="p-4 h-full overflow-y-auto">
+              <MultiSourceResearchPanel
+                caseType={caseData.case_type || ""}
+                caseDescription={caseData.legal_issue_summary || ""}
+                onClose={() => setShowMultiSource(false)}
+              />
+            </div>
+          ) : showResearch ? (
             // Research Panel
             <div className="flex flex-col h-full p-4 overflow-y-auto">
               <h3 className="text-lg font-medium text-[#1a1a1a] mb-4">Legal Research - Indian Kanoon</h3>
@@ -843,7 +1039,7 @@ function CaseDetailView({ caseData, onBack, onDelete }: CaseDetailProps) {
           )}
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 
@@ -853,6 +1049,7 @@ interface LegalResearcherPageProps {
 }
 
 export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalResearcherPageProps) {
+  const [view, setView] = useState<"dashboard" | "drafting">("dashboard");
   const [cases, setCases] = useState<CaseDetails[]>([]);
   const [selectedCase, setSelectedCase] = useState<CaseDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -912,6 +1109,16 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
     } catch (err) {
       console.error("Failed to delete case", err);
     }
+
+  };
+
+  const handleRefreshCase = async (caseId: number) => {
+    try {
+      const res = await getCase(caseId, DEFAULT_USER_ID);
+      if (res.success && res.case) {
+        setSelectedCase(res.case);
+      }
+    } catch (e) { console.error("Refresh failed", e); }
   };
 
   return (
@@ -927,6 +1134,20 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <div className="flex bg-[#e5ddd0] p-1 rounded-lg">
+            <button
+              onClick={() => setView("dashboard")}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${view === "dashboard" ? "bg-white text-[#1a1a1a] shadow-sm" : "text-[#666] hover:text-[#1a1a1a]"}`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setView("drafting")}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${view === "drafting" ? "bg-white text-[#1a1a1a] shadow-sm" : "text-[#666] hover:text-[#1a1a1a]"}`}
+            >
+              Drafting Assistant
+            </button>
+          </div>
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-5 py-2 bg-[#f97316] text-white rounded-lg hover:bg-[#ea580c] transition-colors flex items-center gap-2"
@@ -939,86 +1160,97 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
         </div>
       </div>
 
-      {/* Stats Bar */}
-      {stats && !selectedCase && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-[#f5e6c8]/80 rounded-xl p-4 border border-[#d4b896]/50">
-            <p className="text-2xl font-bold text-[#1a1a1a]">{stats.total_cases}</p>
-            <p className="text-sm text-[#666]">Total Cases</p>
-          </div>
-          <div className="bg-[#f5e6c8]/80 rounded-xl p-4 border border-[#d4b896]/50">
-            <p className="text-2xl font-bold text-[#1a1a1a]">{stats.total_documents}</p>
-            <p className="text-sm text-[#666]">Documents</p>
-          </div>
-          <div className="bg-[#f5e6c8]/80 rounded-xl p-4 border border-[#d4b896]/50">
-            <p className="text-2xl font-bold text-[#1a1a1a]">{stats.total_chats}</p>
-            <p className="text-sm text-[#666]">Chat Messages</p>
-          </div>
+      {view === "drafting" ? (
+        <div className="flex-1 -m-6 z-10">
+          <DraftingAssistant cases={cases} userId={DEFAULT_USER_ID} onBack={() => setView("dashboard")} />
         </div>
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1 min-h-0">
-        {selectedCase ? (
-          <CaseDetailView
-            caseData={selectedCase}
-            onBack={() => setSelectedCase(null)}
-            onDelete={handleDeleteCase}
-          />
-        ) : (
-          <div className="h-full overflow-y-auto">
-            {loading ? (
-              <div className="text-center py-12 text-[#666]">Loading cases...</div>
-            ) : cases.length === 0 ? (
-              <div className="text-center py-12">
-                <svg className="w-16 h-16 mx-auto text-[#d4b896] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-                <h3 className="text-xl font-medium text-[#1a1a1a] mb-2">No cases yet</h3>
-                <p className="text-[#666] mb-6">Create your first case to get started with AI-powered legal research.</p>
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="px-6 py-3 bg-[#f97316] text-white rounded-lg hover:bg-[#ea580c] transition-colors"
-                >
-                  Create Your First Case
-                </button>
+      ) : (
+        <>
+          {/* Stats Bar */}
+          {stats && !selectedCase && (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-[#f5e6c8]/80 rounded-xl p-4 border border-[#d4b896]/50">
+                <p className="text-2xl font-bold text-[#1a1a1a]">{stats.total_cases}</p>
+                <p className="text-sm text-[#666]">Total Cases</p>
               </div>
+              <div className="bg-[#f5e6c8]/80 rounded-xl p-4 border border-[#d4b896]/50">
+                <p className="text-2xl font-bold text-[#1a1a1a]">{stats.total_documents}</p>
+                <p className="text-sm text-[#666]">Documents</p>
+              </div>
+              <div className="bg-[#f5e6c8]/80 rounded-xl p-4 border border-[#d4b896]/50">
+                <p className="text-2xl font-bold text-[#1a1a1a]">{stats.total_chats}</p>
+                <p className="text-sm text-[#666]">Chat Messages</p>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content */}
+          <div className="flex-1 min-h-0">
+            {selectedCase ? (
+              <CaseDetailView
+                caseData={selectedCase}
+                onBack={() => setSelectedCase(null)}
+                onDelete={handleDeleteCase}
+                onRefresh={() => handleRefreshCase(selectedCase.case_id)}
+              />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {cases.map((caseItem) => (
-                  <motion.div
-                    key={caseItem.case_id}
-                    whileHover={{ scale: 1.02 }}
-                    onClick={() => handleSelectCase(caseItem.case_id)}
-                    className="bg-[#f5e6c8]/80 rounded-xl p-5 border border-[#d4b896]/50 cursor-pointer hover:shadow-lg transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <span className="px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-700">
-                        {caseItem.case_type || "General"}
-                      </span>
-                      <span className="text-xs text-[#666]">{new Date(caseItem.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <h3 className="text-lg font-medium text-[#1a1a1a] mb-2" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>
-                      {caseItem.client_name}
-                    </h3>
-                    {caseItem.opposing_party && (
-                      <p className="text-sm text-[#666] mb-3">vs {caseItem.opposing_party}</p>
-                    )}
-                    {caseItem.legal_issue_summary && (
-                      <p className="text-sm text-[#1a1a1a] line-clamp-2">{caseItem.legal_issue_summary}</p>
-                    )}
-                    {caseItem.documents && caseItem.documents.length > 0 && (
-                      <p className="text-xs text-[#8b7355] mt-3 pt-2 border-t border-[#d4b896]/30">
-                        📎 {caseItem.documents.length} document{caseItem.documents.length > 1 ? 's' : ''} attached
-                      </p>
-                    )}
-                  </motion.div>
-                ))}
+              <div className="h-full overflow-y-auto">
+                <EvidenceGallery userId={DEFAULT_USER_ID} onNavigateToCase={handleSelectCase} />
+                {loading ? (
+                  <div className="text-center py-12 text-[#666]">Loading cases...</div>
+                ) : cases.length === 0 ? (
+                  <div className="text-center py-12">
+                    <svg className="w-16 h-16 mx-auto text-[#d4b896] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                    <h3 className="text-xl font-medium text-[#1a1a1a] mb-2">No cases yet</h3>
+                    <p className="text-[#666] mb-6">Create your first case to get started with AI-powered legal research.</p>
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="px-6 py-3 bg-[#f97316] text-white rounded-lg hover:bg-[#ea580c] transition-colors"
+                    >
+                      Create Your First Case
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {cases.map((caseItem) => (
+                      <motion.div
+                        key={caseItem.case_id}
+                        whileHover={{ scale: 1.02 }}
+                        onClick={() => handleSelectCase(caseItem.case_id)}
+                        className="bg-[#f5e6c8]/80 rounded-xl p-5 border border-[#d4b896]/50 cursor-pointer hover:shadow-lg transition-all"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="px-2 py-1 rounded text-xs font-bold bg-blue-100 text-blue-700">
+                            {caseItem.case_type || "General"}
+                          </span>
+                          <span className="text-xs text-[#666]">{new Date(caseItem.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <h3 className="text-lg font-medium text-[#1a1a1a] mb-2" style={{ fontFamily: "'Times New Roman', Georgia, serif" }}>
+                          {caseItem.client_name}
+                        </h3>
+                        {caseItem.opposing_party && (
+                          <p className="text-sm text-[#666] mb-3">vs {caseItem.opposing_party}</p>
+                        )}
+                        {caseItem.legal_issue_summary && (
+                          <p className="text-sm text-[#1a1a1a] line-clamp-2">{caseItem.legal_issue_summary}</p>
+                        )}
+                        {caseItem.documents && caseItem.documents.length > 0 && (
+                          <p className="text-xs text-[#8b7355] mt-3 pt-2 border-t border-[#d4b896]/30">
+                            📎 {caseItem.documents.length} document{caseItem.documents.length > 1 ? 's' : ''} attached
+                          </p>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )
+      }
 
       {/* Modals */}
       <AnimatePresence>
@@ -1029,6 +1261,6 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
           />
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 }

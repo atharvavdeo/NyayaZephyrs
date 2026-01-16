@@ -80,7 +80,9 @@ class DatabaseRouter:
         
         if is_new:
             logger.info(f"Creating new tenant database for user {user_id}")
-            self._init_tenant_tables(conn)
+            
+        # Ensure tables exist (running IF NOT EXISTS is safe schema migration)
+        self._init_tenant_tables(conn)
         
         return conn
     
@@ -183,6 +185,40 @@ class DatabaseRouter:
         
         conn.commit()
         logger.info("Initialized tenant database schema")
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS search_history (
+                search_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                search_type TEXT NOT NULL,
+                query TEXT NOT NULL,
+                jurisdiction TEXT,
+                case_id INTEGER,
+                results_count INTEGER DEFAULT 0,
+                results_json TEXT,
+                FOREIGN KEY(case_id) REFERENCES cases(case_id)
+            )
+        """)
+        
+        # Evidence table for visual evidence analysis
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS evidence (
+                evidence_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id INTEGER NOT NULL,
+                file_type TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                thumbnail_path TEXT,
+                original_filename TEXT,
+                file_size INTEGER,
+                analysis_json TEXT,
+                is_nsfw BOOLEAN DEFAULT 0,
+                content_warning TEXT,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(case_id) REFERENCES cases(case_id)
+            )
+        """)
+        
+        conn.commit()
     
                                                                                   
     
@@ -401,6 +437,139 @@ class DatabaseRouter:
                 LIMIT ?
             """, (resource_type, resource_id, limit))
             return cursor.fetchall()
+    
+    # ============== SEARCH HISTORY ==============
+    
+    def save_search(self, user_id: int, search_type: str, query: str,
+                    jurisdiction: str = None, case_id: int = None,
+                    results_count: int = 0, results_json: str = None) -> int:
+        """
+        Save a search to the user's search history.
+        
+        search_type: 'acts', 'indian_cases', 'us_cases', 'uk_cases', 'comprehensive'
+        """
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                INSERT INTO search_history (search_type, query, jurisdiction, case_id, results_count, results_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (search_type, query, jurisdiction, case_id, results_count, results_json))
+            return cursor.lastrowid
+    
+    def get_search_history(self, user_id: int, search_type: str = None,
+                           case_id: int = None, limit: int = 50) -> List:
+        """Get search history for a user, optionally filtered by type or case."""
+        with self.get_tenant_conn(user_id) as conn:
+            query = "SELECT * FROM search_history WHERE 1=1"
+            params = []
+            
+            if search_type:
+                query += " AND search_type = ?"
+                params.append(search_type)
+            if case_id:
+                query += " AND case_id = ?"
+                params.append(case_id)
+            
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor = conn.execute(query, params)
+            return cursor.fetchall()
+    
+    def get_recent_searches(self, user_id: int, limit: int = 10) -> List:
+        """Get most recent unique search queries for quick access."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                SELECT search_type, query, MAX(timestamp) as last_searched, COUNT(*) as search_count
+                FROM search_history 
+                GROUP BY search_type, query
+                ORDER BY last_searched DESC 
+                LIMIT ?
+            """, (limit,))
+            return cursor.fetchall()
+    
+    # ============== EVIDENCE MANAGEMENT ==============
+    
+    def save_evidence(self, user_id: int, case_id: int, file_type: str,
+                      file_path: str, original_filename: str, file_size: int,
+                      analysis_json: str = None, is_nsfw: bool = False,
+                      content_warning: str = None, thumbnail_path: str = None) -> int:
+        """
+        Save evidence metadata to the user's tenant database.
+        
+        Args:
+            user_id: User ID
+            case_id: Associated case ID
+            file_type: 'image' or 'video'
+            file_path: Path to stored file
+            original_filename: Original name of uploaded file
+            file_size: File size in bytes
+            analysis_json: JSON string of Gemini analysis results
+            is_nsfw: Whether content is flagged as NSFW
+            content_warning: Optional warning text
+            thumbnail_path: Path to thumbnail (for videos)
+            
+        Returns:
+            evidence_id of created record
+        """
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                INSERT INTO evidence 
+                (case_id, file_type, file_path, original_filename, file_size, 
+                 analysis_json, is_nsfw, content_warning, thumbnail_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (case_id, file_type, file_path, original_filename, file_size,
+                  analysis_json, is_nsfw, content_warning, thumbnail_path))
+            return cursor.lastrowid
+    
+    def get_case_evidence(self, user_id: int, case_id: int) -> List:
+        """Get all evidence items for a case."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                SELECT * FROM evidence WHERE case_id = ? ORDER BY uploaded_at DESC
+            """, (case_id,))
+            return cursor.fetchall()
+    
+    def get_evidence_item(self, user_id: int, evidence_id: int):
+        """Get a specific evidence item."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                SELECT * FROM evidence WHERE evidence_id = ?
+            """, (evidence_id,))
+            return cursor.fetchone()
+    
+    def delete_evidence(self, user_id: int, evidence_id: int) -> bool:
+        """Delete an evidence item."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                DELETE FROM evidence WHERE evidence_id = ?
+            """, (evidence_id,))
+            return cursor.rowcount > 0
+
+    def get_all_user_evidence(self, user_id: int, limit: int = 50) -> List:
+        """
+        Get recent evidence items from ALL cases for this user.
+        Joins with cases table to get client/case name.
+        """
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                SELECT e.*, c.client_name 
+                FROM evidence e
+                JOIN cases c ON e.case_id = c.case_id
+                ORDER BY e.uploaded_at DESC
+                LIMIT ?
+            """, (limit,))
+            return cursor.fetchall()
+    
+    def get_evidence_count(self, user_id: int, case_id: int = None) -> int:
+        """Get count of evidence items, optionally filtered by case."""
+        with self.get_tenant_conn(user_id) as conn:
+            if case_id:
+                cursor = conn.execute(
+                    "SELECT COUNT(*) as cnt FROM evidence WHERE case_id = ?", (case_id,))
+            else:
+                cursor = conn.execute("SELECT COUNT(*) as cnt FROM evidence")
+            row = cursor.fetchone()
+            return row['cnt'] if row else 0
 
 
                                                     

@@ -65,3 +65,4 @@ htmlcov/
 .pytest_cache/
 .vercel
 Zephyrs-ZeroDayPPT.pdf
+*.pdf

@@ -1137,6 +1137,10 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
   const [cases, setCases] = useState<CaseDetails[]>([]);
   const [_casesLoading, setCasesLoading] = useState(true);
 
+  // eCourts India Statistics
+  const [eCourtsStats, setECourtsStats] = useState<any>(null);
+  const [eCourtsLoading, setECourtsLoading] = useState(true);
+
   // Fetch real stats from backend
   useEffect(() => {
     const fetchStats = async () => {
@@ -1170,6 +1174,24 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
       }
     };
     fetchCases();
+  }, []);
+
+  // Fetch eCourts India statistics
+  useEffect(() => {
+    const fetchECourts = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/legal/ecourts/statistics");
+        if (response.ok) {
+          const data = await response.json();
+          setECourtsStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch eCourts stats:", error);
+      } finally {
+        setECourtsLoading(false);
+      }
+    };
+    fetchECourts();
   }, []);
 
   // Use fetched stats with fallback
@@ -1483,6 +1505,126 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
                   <p className="text-[11px] text-[#666] text-center">No upcoming events</p>
                 )}
               </div>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* eCourts India Live Statistics */}
+        <div className="px-4 pb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.85 }}
+            className="bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-[#d4b896]/50"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#6b5744]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                </svg>
+                <h3 className="text-[18px] font-semibold text-[#1a1a1a]" style={{ fontFamily: "'Times New Roman', Georgia, serif", fontStyle: "italic" }}>eCourts India - Live Statistics</h3>
+              </div>
+              <span className="text-[11px] text-[#6b5744] px-2 py-1 bg-[#e5ddd0] rounded-full">🔴 LIVE</span>
+            </div>
+
+            {eCourtsLoading ? (
+              <div className="text-[#666] text-center py-4">Loading court statistics...</div>
+            ) : eCourtsStats ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+                {/* High Court Stats */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">High Courts</p>
+                  <p className="text-[24px] font-bold text-[#1a1a1a]">{eCourtsStats.hc_complexes}</p>
+                  <p className="text-[11px] text-[#666]">Complexes</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">HC Pending</p>
+                  <p className="text-[28px] font-bold text-[#f97316]">{eCourtsStats.hc_pending_cases}</p>
+                  <p className="text-[11px] text-[#666]">Cases Pending</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">HC Disposed</p>
+                  <p className="text-[24px] font-bold text-green-600">{eCourtsStats.hc_disposed_cases}</p>
+                  <p className="text-[11px] text-[#666]">Cases Disposed</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">HC Today</p>
+                  <p className="text-[24px] font-bold text-[#1a1a1a]">{eCourtsStats.hc_cases_listed_today}</p>
+                  <p className="text-[11px] text-[#666]">Listed Today</p>
+                </div>
+                {/* District Court Stats */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">District Courts</p>
+                  <p className="text-[24px] font-bold text-[#1a1a1a]">{eCourtsStats.dc_complexes}</p>
+                  <p className="text-[11px] text-[#666]">Complexes</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">DC Pending</p>
+                  <p className="text-[28px] font-bold text-[#f97316]">{eCourtsStats.dc_pending_cases}</p>
+                  <p className="text-[11px] text-[#666]">Cases Pending</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">DC Disposed</p>
+                  <p className="text-[24px] font-bold text-green-600">{eCourtsStats.dc_disposed_last_month}</p>
+                  <p className="text-[11px] text-[#666]">Last Month</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4 border border-[#d4b896]/30">
+                  <p className="text-[10px] text-[#666] uppercase mb-1">DC Today</p>
+                  <p className="text-[24px] font-bold text-[#1a1a1a]">{eCourtsStats.dc_cases_listed_today}</p>
+                  <p className="text-[11px] text-[#666]">Listed Today</p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-[#666] text-center py-4">Unable to load statistics</div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Multi-Source Research Options */}
+        <div className="px-4 pb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Search Acts */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.02, y: -5 }}
+              transition={{ duration: 0.5, delay: 0.86 }}
+              onClick={() => onNavigate("legal-researcher")}
+              className="bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-5 shadow-lg border border-[#d4b896]/50 cursor-pointer"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-[#f97316] rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-[#1a1a1a]">Search Acts</h4>
+                  <p className="text-[12px] text-[#666]">IndiaCode Legislation</p>
+                </div>
+              </div>
+              <p className="text-[13px] text-[#666]">Search Indian acts and find applicable legislation for your cases</p>
+            </motion.div>
+
+            {/* US Case Law */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.02, y: -5 }}
+              transition={{ duration: 0.5, delay: 0.87 }}
+              onClick={() => onNavigate("legal-researcher")}
+              className="bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-5 shadow-lg border border-[#d4b896]/50 cursor-pointer"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-[#6b5744] rounded-lg flex items-center justify-center">
+                  <span className="text-white text-lg">🇺🇸</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-[#1a1a1a]">US Case Law</h4>
+                  <p className="text-[12px] text-[#666]">Federal Court Opinions</p>
+                </div>
+              </div>
+              <p className="text-[13px] text-[#666]">Search US federal court cases with similar case matching</p>
             </motion.div>
           </div>
         </div>
