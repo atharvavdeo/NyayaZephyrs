@@ -337,3 +337,4 @@ cd landing1
 npm install
 npm run dev
 ```
+# HackWise_LegalAid
