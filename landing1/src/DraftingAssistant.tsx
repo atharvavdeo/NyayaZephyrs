@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Wand2, Save,
     Bold, Italic, List,
     ChevronRight, ChevronLeft
 } from 'lucide-react';
-import { suggestDrafting, type DraftingResponse, type CaseDetails } from './api/legalResearcher';
+import { suggestDrafting, saveDraft, type DraftingResponse, type CaseDetails } from './api/legalResearcher';
 
 interface DraftingAssistantProps {
     cases: CaseDetails[];
@@ -53,6 +53,70 @@ export default function DraftingAssistant({ cases, userId, onBack }: DraftingAss
         }
     };
 
+    const handleSave = async () => {
+        // 1. Download locally
+        const filename = `Draft_${selectedCase?.client_name || 'Document'}_${new Date().toISOString().split('T')[0]}.txt`;
+        const element = document.createElement("a");
+        const file = new Blob([content], { type: 'text/plain' });
+        element.href = URL.createObjectURL(file);
+        element.download = filename;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+
+        // 2. Save to Backend
+        if (selectedCaseId) {
+            try {
+                await saveDraft({
+                    case_id: selectedCaseId,
+                    user_id: userId,
+                    filename: filename,
+                    content: content
+                });
+                // Optional: Notify parent or show toast
+            } catch (e) {
+                console.error("Failed to save to backend", e);
+            }
+        }
+
+        setLastSaved(new Date());
+    };
+
+    const applyFormat = (type: 'bold' | 'italic' | 'list') => {
+        const textarea = document.querySelector('textarea');
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = content.substring(start, end);
+        let newText = "";
+        let newCursorPos = end;
+
+        switch (type) {
+            case 'bold':
+                newText = `**${selectedText}**`;
+                newCursorPos += 4;
+                break;
+            case 'italic':
+                newText = `*${selectedText}*`;
+                newCursorPos += 2;
+                break;
+            case 'list':
+                newText = `\n- ${selectedText}`;
+                newCursorPos += 3;
+                break;
+        }
+
+        const nextContent = content.substring(0, start) + newText + content.substring(end);
+        setContent(nextContent);
+
+        // Restore focus and cursor (approximate)
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+    };
+
     return (
         <div className="flex h-screen bg-[#f5f1e8] overflow-hidden">
             {/* Left Sidebar - Navigation & Case Select */}
@@ -95,11 +159,11 @@ export default function DraftingAssistant({ cases, userId, onBack }: DraftingAss
                 {/* Toolbar */}
                 <div className="h-14 bg-white border-b border-[#d4b896] flex items-center px-4 justify-between">
                     <div className="flex items-center gap-2">
-                        <button className="p-2 hover:bg-gray-100 rounded" title="Bold"><Bold size={18} /></button>
-                        <button className="p-2 hover:bg-gray-100 rounded" title="Italic"><Italic size={18} /></button>
-                        <button className="p-2 hover:bg-gray-100 rounded" title="Bullet List"><List size={18} /></button>
+                        <button onClick={() => applyFormat('bold')} className="p-2 hover:bg-gray-100 rounded" title="Bold"><Bold size={18} /></button>
+                        <button onClick={() => applyFormat('italic')} className="p-2 hover:bg-gray-100 rounded" title="Italic"><Italic size={18} /></button>
+                        <button onClick={() => applyFormat('list')} className="p-2 hover:bg-gray-100 rounded" title="Bullet List"><List size={18} /></button>
                         <div className="w-px h-6 bg-gray-300 mx-2" />
-                        <button className="p-2 hover:bg-gray-100 rounded" title="Save"><Save size={18} /></button>
+                        <button onClick={handleSave} className="p-2 hover:bg-gray-100 rounded" title="Save & Download"><Save size={18} /></button>
                         {lastSaved && <span className="text-xs text-gray-500">Saved: {lastSaved.toLocaleTimeString()}</span>}
                     </div>
                     <div className="flex items-center gap-2">

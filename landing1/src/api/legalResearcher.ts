@@ -806,6 +806,62 @@ export interface InternationalResearchResponse {
   uk_cases: InternationalCase[];
 }
 
+
+
+// ==================== DRAFTING ====================
+
+export interface SaveDraftRequest {
+  case_id: number;
+  user_id: number;
+  filename: string;
+  content: string;
+}
+
+export async function saveDraft(data: SaveDraftRequest): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch(`${API_BASE}/drafting/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, message: errorData.detail || "Failed to save draft" };
+    }
+    return response.json();
+  } catch (error) {
+    return { success: false, message: "Connection failed" };
+  }
+}
+
+export interface DraftingRequest {
+  case_id: number;
+  user_id: number;
+  current_text: string;
+  instruction: string;
+  context?: string;
+}
+
+export interface DraftingResponse {
+  suggestion: string;
+  reasoning: string;
+  citations: string[];
+}
+
+export async function suggestDrafting(data: DraftingRequest): Promise<DraftingResponse> {
+  const response = await fetch(`${API_BASE}/drafting/suggest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`Drafting API error: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+
 export async function searchInternationalCases(request: InternationalSearchRequest): Promise<InternationalResearchResponse> {
   try {
     const response = await fetch(`${API_BASE}/research/international`, {
@@ -993,31 +1049,5 @@ export async function getCaseResearchHistory(caseId: number, userId: number): Pr
   return response.json();
 }
 
-// ==================== DRAFTING ====================
 
-export interface DraftingRequest {
-  case_id: number;
-  user_id: number;
-  current_text: string;
-  instruction: string;
-  context?: string;
-}
-
-export interface DraftingResponse {
-  suggestion: string;
-  reasoning?: string;
-  citations: string[];
-}
-
-export async function suggestDrafting(data: DraftingRequest): Promise<DraftingResponse> {
-  const response = await fetch(`${API_BASE}/draft/suggest`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    throw new Error("Drafting suggestion failed");
-  }
-  return response.json();
-}
 

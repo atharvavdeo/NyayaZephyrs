@@ -105,6 +105,44 @@ class CaseGenerator:
             pdf.ln(2)
 
                                   
+            pdf.ln(2)
+
+        # ----------------------------------------------------
+        # VISUAL OF EVIDENCE SECTION
+        # ----------------------------------------------------
+        evidence_items = self.db.get_case_evidence(user_id, case_id)
+        if evidence_items:
+            pdf.ln(10)
+            pdf.set_font("Arial", 'B', 14)
+            pdf.cell(200, 10, txt="Visual Evidence Analysis", ln=1, align='L')
+            pdf.ln(5)
+            
+            for item in evidence_items:
+                pdf.set_font("Arial", 'B', 11)
+                pdf.cell(0, 8, txt=f"File: {item['original_filename']} ({item['file_type']})", ln=1)
+                
+                # Parse analysis JSON
+                analysis_text = "No analysis available."
+                if item['analysis_json']:
+                    try:
+                        analysis = json.loads(item['analysis_json'])
+                        # Extract key findings or summary
+                        if 'analysis' in analysis: # Wrapper
+                            analysis = analysis['analysis']
+                        
+                        scene = analysis.get('scene_description', 'No description.')
+                        findings = analysis.get('key_findings', [])
+                        
+                        analysis_text = f"Scene: {scene}\n"
+                        if findings:
+                            analysis_text += "Key Findings:\n- " + "\n- ".join(findings)
+                    except:
+                        pass
+                
+                pdf.set_font("Arial", size=10)
+                pdf.multi_cell(0, 6, txt=analysis_text)
+                pdf.ln(5)
+
         os.makedirs("exports", exist_ok=True)
         
         client_name = data.get('client_name', 'Client').replace(" ", "_").replace("/", "-")

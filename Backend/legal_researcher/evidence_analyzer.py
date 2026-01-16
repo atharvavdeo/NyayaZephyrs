@@ -72,8 +72,8 @@ class EvidenceAnalyzer:
         
         # Configure Gemini
         genai.configure(api_key=self.api_key)
-        # Using gemini-2.0-flash for best performance
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        # Using gemini-3-flash-preview as requested by user
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
         
         # Rate limiter (15 requests per minute for free tier)
         self.rate_limiter = RateLimiter(max_requests=15, window_seconds=60)
