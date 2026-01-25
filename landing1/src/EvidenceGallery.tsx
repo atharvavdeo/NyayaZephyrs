@@ -47,9 +47,14 @@ const EvidenceGallery: React.FC<EvidenceGalleryProps> = ({ userId, onNavigateToC
                     >
                         {item.file_type === 'image' ? (
                             <img
-                                src={`${import.meta.env.VITE_API_URL || "http://localhost:8000/legal"}/evidence/file/${item.evidence_id}?user_id=${userId}${item.is_nsfw ? '&blurred=true' : ''}`}
+                                src={`http://localhost:8000/legal/evidence/file/${item.evidence_id}?user_id=${userId}${item.is_nsfw ? '&blurred=true' : ''}`}
                                 alt={item.original_filename}
                                 className={`w-full h-full object-cover ${item.is_nsfw ? 'blur-md group-hover:blur-sm transition-all' : ''}`}
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.parentElement?.classList.add('bg-gray-200');
+                                }}
                             />
                         ) : item.file_type === 'video' ? (
                             <div className="flex items-center justify-center w-full h-full bg-black">

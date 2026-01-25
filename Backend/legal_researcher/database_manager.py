@@ -405,9 +405,37 @@ class DatabaseRouter:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (action, resource_type, resource_id, ip_address, user_agent, details, status))
     
-    def get_audit_logs(self, user_id: int, action: str = None, 
+    def get_audit_logs(self, user_id: int = None, action: str = None, 
                        resource_type: str = None, limit: int = 100) -> List:
-        """Get audit logs from user's tenant database."""
+        """
+        Get audit logs from user's tenant database or master auth logs if user_id is None.
+        """
+        if user_id is None:
+            # If no user_id, fetch from global auth logs (Admin view)
+            with self.get_master_conn() as conn:
+                query = "SELECT log_id, timestamp, user_id, action, ip_address, user_agent, status, details FROM auth_audit_logs WHERE 1=1"
+                params = []
+                
+                if action:
+                    query += " AND action = ?"
+                    params.append(action)
+                
+                query += " ORDER BY timestamp DESC LIMIT ?"
+                params.append(limit)
+                
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+                
+                # Adapt to schema expected by API (auth logs don't have resource_type/id)
+                results = []
+                for row in rows:
+                    item = dict(row)
+                    item['resource_type'] = 'auth' 
+                    item['resource_id'] = None
+                    results.append(item)
+                return results
+
+        # Existing tenant logic
         with self.get_tenant_conn(user_id) as conn:
             query = "SELECT * FROM audit_logs WHERE 1=1"
             params = []
@@ -423,7 +451,15 @@ class DatabaseRouter:
             params.append(limit)
             
             cursor = conn.execute(query, params)
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            
+            # Inject user_id into the result since tenant logs don't store it (implied)
+            results = []
+            for row in rows:
+                item = dict(row)
+                item['user_id'] = user_id
+                results.append(item)
+            return results
     
     def get_resource_access_history(self, user_id: int, resource_type: str, 
                                      resource_id: int, limit: int = 50) -> List:

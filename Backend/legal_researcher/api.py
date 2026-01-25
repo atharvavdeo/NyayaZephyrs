@@ -169,11 +169,7 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-class AuthResponse(BaseModel):
-    success: bool
-    message: str
-    user_id: Optional[int] = None
-    username: Optional[str] = None
+# AuthResponse is imported from jwt_auth module
 
                      
 class ManualCaseCreate(BaseModel):
@@ -260,49 +256,7 @@ class ResearchResponse(BaseModel):
     total_found: int
 
 
-                                                          
-
-@router.post("/auth/register", response_model=AuthResponse)
-async def register_user(request: RegisterRequest):
-    """
-    Register a new user account.
-    Password is hashed with bcrypt before storage.
-    """
-    if get_db_manager().register_user(request.username, request.password):
-        return AuthResponse(
-            success=True,
-            message=f"Account created for {request.username}",
-            username=request.username
-        )
-    raise HTTPException(status_code=400, detail="Username already taken")
-
-
-@router.post("/auth/login", response_model=AuthResponse)
-async def login_user(request: LoginRequest):
-    """
-    Authenticate user and return user_id for session management.
-    """
-    user = get_db_manager().login_user(request.username, request.password)
-    if user:
-        return AuthResponse(
-            success=True,
-            message=f"Welcome back, {request.username}!",
-            user_id=user['user_id'],
-            username=user['username']
-        )
-    raise HTTPException(status_code=401, detail="Invalid credentials")
-
-
-@router.get("/auth/user/{user_id}")
-async def get_user_info(user_id: int):
-    """Get username by user_id."""
-    username = get_db_manager().get_username(user_id)
-    if username != "Unknown":
-        return {"user_id": user_id, "username": username}
-    raise HTTPException(status_code=404, detail="User not found")
-
-
-                                                                        
+# ====================== AUTHENTICATION ENDPOINTS ======================
 
 @router.post("/auth/register", response_model=AuthResponse)
 async def register_user(credentials: UserCredentials, request: Request):
@@ -375,6 +329,7 @@ async def login_user(credentials: UserCredentials, request: Request):
     if not user:
                                   
         db.log_audit(
+            user_id=0,  # Use 0 for failed login attempts (no valid user)
             action="LOGIN_FAILED",
             resource_type="auth",
             ip_address=client_ip,

@@ -1606,26 +1606,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <p className="text-[13px] text-[#666]">Search Indian acts and find applicable legislation for your cases</p>
             </motion.div>
 
-            {/* US Case Law */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ scale: 1.02, y: -5 }}
-              transition={{ duration: 0.5, delay: 0.87 }}
-              onClick={() => onNavigate("legal-researcher")}
-              className="bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-5 shadow-lg border border-[#d4b896]/50 cursor-pointer"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-[#6b5744] rounded-lg flex items-center justify-center">
-                  <span className="text-white text-lg">🇺🇸</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-[#1a1a1a]">US Case Law</h4>
-                  <p className="text-[12px] text-[#666]">Federal Court Opinions</p>
-                </div>
-              </div>
-              <p className="text-[13px] text-[#666]">Search US federal court cases with similar case matching</p>
-            </motion.div>
+            {/* US Case Law - Removed per user request */}
           </div>
         </div>
 

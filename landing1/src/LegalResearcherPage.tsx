@@ -1056,17 +1056,34 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [stats, setStats] = useState<{ total_cases: number; total_documents: number; total_chats: number } | null>(null);
 
+  // Load cached data on mount, then fetch fresh data in background
   useEffect(() => {
+    // Try to load from cache first for instant display
+    const cachedCases = sessionStorage.getItem('legal_cases');
+    const cachedStats = sessionStorage.getItem('legal_stats');
+
+    if (cachedCases) {
+      setCases(JSON.parse(cachedCases));
+      setLoading(false);
+    }
+    if (cachedStats) {
+      setStats(JSON.parse(cachedStats));
+    }
+
+    // Then fetch fresh data
     fetchCases();
     fetchStats();
   }, []);
 
   const fetchCases = async () => {
-    setLoading(true);
+    if (!sessionStorage.getItem('legal_cases')) {
+      setLoading(true);
+    }
     try {
       const res = await getUserCases(DEFAULT_USER_ID);
       if (res.success) {
         setCases(res.cases);
+        sessionStorage.setItem('legal_cases', JSON.stringify(res.cases));
       }
     } catch (err) {
       console.error("Failed to fetch cases", err);
@@ -1080,6 +1097,7 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
       const res = await getUserStats(DEFAULT_USER_ID);
       if (res.success && res.stats) {
         setStats(res.stats);
+        sessionStorage.setItem('legal_stats', JSON.stringify(res.stats));
       }
     } catch (err) {
       console.error("Failed to fetch stats", err);
