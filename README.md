@@ -11,17 +11,29 @@
 ## 📸 App Preview
 
 ### Landing Page
-![Landing Page Hero](./LandingPage1.png)
-![Landing Page Features](./LandingPage2.png)
+![Landing Page Hero](./images/LandingPage1.png)
+![Landing Page Features](./images/LandingPage2.png)
 
 ### Dashboard
-![Dashboard Overview](./Dashboard.png)
+![Dashboard Overview](./images/Dashboard.png)
 
 ### Document Analyzer
-![Document Analysis Interface](./Doc%20Analyser.png)
+![Document Analysis Interface](./images/Doc%20Analyser.png)
 
 ### Legal Researcher
-![Research Module](./Researcher.png)
+![Research Module](./images/Researcher.png)
+
+### Indian Kanoon
+![Indian Kanoon](./images/indian%20kanoon.png)
+
+### Evidence Timeline & Gallery
+![Evidence Analysis](./images/evidence.png)
+
+### Acts Analysis
+![Acts Analysis](./images/Acts%20analysis.png)
+
+### Drafting Assistant
+![Drafting Assistant](./images/Drafter_image.png)
 
 ---
 
@@ -49,6 +61,8 @@ Unlike standard LegalWrappers, NyayaZephyr implements a **defense-in-depth secur
 - 📁 **Case Management**: Create, track, and manage legal cases with progress tracking
 - 🤖 **AI-Powered Chat**: Context-aware conversations with your case documents
 - 🔍 **Legal Research**: Automated research using Firecrawl and Groq LLMs
+- 🔬 **AI Evidence Analyzer**: Automated image and video analysis using Gemini Vision
+- ⏳ **Interactive Timeline**: Visual evidence chronology with AI-extracted key moments
 - 🔒 **Enterprise Security**: JWT auth, multi-tenant isolation, audit logging
 - 🌍 **Multilingual**: Support for 10+ languages including Hindi, Spanish, French
 - 📊 **Admin Dashboard**: Real-time security monitoring and compliance tracking
@@ -74,6 +88,8 @@ Unlike standard LegalWrappers, NyayaZephyr implements a **defense-in-depth secur
 
 ### AI & Data Engineering
 *   **LLM Inference**: Groq LPU (Llama-3-70b-Versatile)
+*   **Vision API**: Google Gemini-1.5-Flash (via Google Generative AI SDK)
+*   **Image Processing**: OpenCV, Pillow (PIL)
 *   **Web Search**: Firecrawl SDK (Custom Legal Scraper)
 *   **PDF Processing**: PyPDF2, pdfplumber
 *   **Guards**: Custom Regex Guardrails, Output Validators
@@ -90,6 +106,7 @@ Unlike standard LegalWrappers, NyayaZephyr implements a **defense-in-depth secur
 The platform follows a **Secure Monorepo** structure with a decoupled React frontend and a FastAPI backend.
 
 ```mermaid
+
 graph TD
     User[Legal Professional] -->|HTTPS/TLS| FE[React Frontend]
     FE -->|JWT Auth Bearer| API[FastAPI Backend]
@@ -112,6 +129,7 @@ graph TD
         Chat <-->|Inference| Groq["Groq LPU (Llama 3)"]
         Gen <-->|Research| Firecrawl[Firecrawl Search]
     end
+    
 ```
 
 ---
@@ -255,9 +273,46 @@ graph LR
 
 ---
 
+## 🔬 AI Evidence Analyzer & Timeline
+
+A specialized module for analyzing visual evidence (images and videos) using **Google Gemini Vision**.
+
+### Visual Evidence Workflow
+1.  **Media Upload**: Supports high-res images (up to 10MB) and videos (up to 100MB).
+2.  **AI Vision Analysis**:
+    *   **Object Detection**: Identifies relevant items (weapons, documents, vehicle damage).
+    *   **Scene Understanding**: Generates detailed forensic descriptions.
+    *   **Text Extraction (OCR)**: Extracts text from signs, labels, and documents within images.
+    *   **Safety Audit**: Automatic NSFW/violence detection with optional blurring.
+3.  **Video Chronology**:
+    *   Samples frames at configurable intervals.
+    *   Analyzes each frame to detect "Key Moments".
+    *   Generates an **Interactive Evidence Timeline** for rapid review of long footage.
+4.  **Annotated Visuals**: Generates high-contrast bounding boxes on detected objects for court presentation.
+
+---
+
 ## 🔍 Legal Researcher Architecture
 
-A dedicated module for autonomous web-based legal research using **Firecrawl**.
+A dedicated module for autonomous web-based legal research using **Firecrawl** and **Sentence-BERT**.
+
+```mermaid
+graph TD
+    subgraph "Legal Research Pipeline"
+        Q[User Query] -->|1. Generate Search Terms| LLM1[Groq LPU]
+        LLM1 -->|2. Search & Scrape| FC[Firecrawl SDK]
+        FC -->|Raw Markdown| Ext[Info Extractor]
+        Ext -->|JSON Cases| RR[Sentence-BERT Re-Ranker]
+        
+        subgraph "Local Re-Ranking Engine"
+            RR -->|all-MiniLM-L6-v2| Embed[Vector Embeddings]
+            Embed -->|NumPy Cosine Sim| Rank[Relevance Score]
+            Rank -->|Boost Supreme Court| FinalSort[Sorted Results]
+        end
+        
+        FinalSort -->|3. Response| API[FastAPI Endpoint]
+    end
+```
 
 ### Workflow
 1.  **Query Generation**: LLM analyzes basic case facts to generate 3-5 specific search queries (e.g., "Supreme Court Property dispute brother sister").
@@ -265,10 +320,18 @@ A dedicated module for autonomous web-based legal research using **Firecrawl**.
     *   Searches trusted legal repositories (e.g., Indian Kanoon).
     *   Respects `robots.txt` and implements rate limiting (6s delay).
     *   Extracts page content as markdown.
-3.  **Re-Ranking & Filtering**:
-    *   LLM reviews scraped content to filter out irrelevant cases.
-    *   Extracts `Verdict`, `Court`, `Year`, and generates a 2-sentence summary.
+3.  **Local Re-Ranking Engine**:
+    *   A local `SentenceTransformer` (`all-MiniLM-L6-v2`) converts documents and queries to vector space.
+    *   Computes relevance locally via `NumPy` dot-product cosine similarity.
+    *   Boosts specific geographic and hierarchical jurisdictions (e.g., `+0.2` score for Supreme Court/India matches) to heavily favor decisive case law.
 4.  **Storage**: Results are stored in a structured JSON database (per client) for later retrieval.
+
+### OS Compatibility Note (macOS / Apple Silicon)
+> **Warning:** Apple's `Accelerate` multiprocessing backend contains known bugs with Rust-based Tokenizers and multiprocessing in Python, leading to `[mutex.cc : 452] RAW: Lock blocking` freezes.
+> To run the backend safely on macOS, set the following environment variables:
+> `export TOKENIZERS_PARALLELISM=false`
+> `export OMP_NUM_THREADS=1`
+> *(See `macos.md` for a comprehensive breakdown and Windows/Linux instructions).*
 
 ---
 
@@ -323,12 +386,15 @@ cd Backend/legal_researcher
 python -m venv venv
 source venv/bin/activate
 
-# Install deps
+# Install core deps
 pip install -r requirements.txt
+
+# Install Evidence Analyzer deps (OpenCV, Gemini)
+pip install -r requirements_evidence.txt
 
 # Environment Setup
 cp .env.example .env
-# Edit .env with your keys
+# Edit .env and add your GROQ_API_KEY, FIRECRAWL_API_KEY, and GEMINI_API_KEY
 ```
 
 ### Frontend Setup
@@ -337,4 +403,3 @@ cd landing1
 npm install
 npm run dev
 ```
-# HackWise_LegalAid
