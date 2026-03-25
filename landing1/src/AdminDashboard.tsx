@@ -44,6 +44,9 @@ export default function AdminDashboard() {
     const fetchAuditLogs = async () => {
         try {
             const res = await fetch("http://localhost:8000/legal/audit/logs?limit=100");
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
             const data = await res.json();
             setAuditLogs(data.logs || []);
 
@@ -71,6 +74,9 @@ export default function AdminDashboard() {
     const runSecurityChecks = async () => {
         try {
             const res = await fetch("http://localhost:8000/legal/security/status");
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
             const data = await res.json();
 
             // Map API response to SecurityCheck format

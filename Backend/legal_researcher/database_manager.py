@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+import os
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 """
 This module implements the Multi-Tenant Database Architecture. It defines the DatabaseRouter class which routes queries to isolated tenant databases (lawyer_X.db) or the master authentication database based on user context.
 """
@@ -17,7 +20,12 @@ This architecture ensures:
 4. GDPR-compliant data deletion (delete entire file)
 """
 
-import sqlite3
+import os
+if os.getenv("TURSO_DATABASE_URL"):
+    import libsql_experimental as sqlite3
+else:
+    import sqlite3
+
 import os
 import logging
 import bcrypt
@@ -97,15 +105,15 @@ class DatabaseRouter:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    email TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_login TIMESTAMP
+                      clerk_id TEXT UNIQUE,
+                      username TEXT UNIQUE NOT NULL,
+                      password_hash TEXT,
+                      email TEXT,
+                      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                      last_login TIMESTAMP
                 )
             """)
-            
-                                                                
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS auth_audit_logs (
                     log_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -219,6 +227,25 @@ class DatabaseRouter:
         """)
         
         conn.commit()
+
+        # Add timeline columns to documents table if not present
+        try:
+            cursor.execute("ALTER TABLE documents ADD COLUMN annotation TEXT DEFAULT ''")
+        except Exception:
+            pass  # Column already exists
+        try:
+            cursor.execute("ALTER TABLE documents ADD COLUMN event_date TIMESTAMP")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE documents ADD COLUMN evidence_type TEXT DEFAULT 'document'")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE documents ADD COLUMN event_title TEXT")
+        except Exception:
+            pass
+        conn.commit()
     
                                                                                   
     
@@ -245,12 +272,34 @@ class DatabaseRouter:
                 return user_id
         except sqlite3.IntegrityError:
             return None                           
-    
-    def login_user(self, username: str, password: str) -> Optional[Dict]:
+
+    def sync_clerk_user(self, clerk_id: str, username: str, email: str = None) -> Optional[int]:
         """
-        Verify credentials against Master DB.
-        Returns user dict with user_id and username, or None if invalid.
+        Sync a Clerk user to the local database. Creates or fetches based on clerk_id.
         """
+        try:
+            with self.get_master_conn() as conn:
+                # 1. Check if user already exists
+                cursor = conn.execute("SELECT user_id FROM users WHERE clerk_id = ?", (clerk_id,))
+                user = cursor.fetchone()
+                if user:
+                    conn.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE clerk_id = ?", (clerk_id,))
+                    return user[0]
+
+                # 2. Insert if not exists
+                cursor = conn.execute(
+                    "INSERT INTO users (clerk_id, username, email, password_hash) VALUES (?, ?, ?, ?)",
+                    (clerk_id, username, email, "CLERK_AUTH")
+                )
+                user_id = cursor.lastrowid
+                
+                # Create their tenant DB
+                tenant_conn = self.get_tenant_conn(user_id)
+                tenant_conn.close()
+                return user_id
+        except Exception as e:
+            logger.error(f"Error syncing Clerk user: {e}")
+            return None
         with self.get_master_conn() as conn:
             cursor = conn.execute(
                 "SELECT user_id, username, password_hash FROM users WHERE username = ?",
@@ -405,9 +454,37 @@ class DatabaseRouter:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (action, resource_type, resource_id, ip_address, user_agent, details, status))
     
-    def get_audit_logs(self, user_id: int, action: str = None, 
+    def get_audit_logs(self, user_id: int = None, action: str = None, 
                        resource_type: str = None, limit: int = 100) -> List:
-        """Get audit logs from user's tenant database."""
+        """
+        Get audit logs from user's tenant database or master auth logs if user_id is None.
+        """
+        if user_id is None:
+            # If no user_id, fetch from global auth logs (Admin view)
+            with self.get_master_conn() as conn:
+                query = "SELECT log_id, timestamp, user_id, action, ip_address, user_agent, status, details FROM auth_audit_logs WHERE 1=1"
+                params = []
+                
+                if action:
+                    query += " AND action = ?"
+                    params.append(action)
+                
+                query += " ORDER BY timestamp DESC LIMIT ?"
+                params.append(limit)
+                
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+                
+                # Adapt to schema expected by API (auth logs don't have resource_type/id)
+                results = []
+                for row in rows:
+                    item = dict(row)
+                    item['resource_type'] = 'auth' 
+                    item['resource_id'] = None
+                    results.append(item)
+                return results
+
+        # Existing tenant logic
         with self.get_tenant_conn(user_id) as conn:
             query = "SELECT * FROM audit_logs WHERE 1=1"
             params = []
@@ -423,7 +500,15 @@ class DatabaseRouter:
             params.append(limit)
             
             cursor = conn.execute(query, params)
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            
+            # Inject user_id into the result since tenant logs don't store it (implied)
+            results = []
+            for row in rows:
+                item = dict(row)
+                item['user_id'] = user_id
+                results.append(item)
+            return results
     
     def get_resource_access_history(self, user_id: int, resource_type: str, 
                                      resource_id: int, limit: int = 50) -> List:
@@ -570,6 +655,52 @@ class DatabaseRouter:
                 cursor = conn.execute("SELECT COUNT(*) as cnt FROM evidence")
             row = cursor.fetchone()
             return row['cnt'] if row else 0
+
+    # ============== TIMELINE EVENTS ==============
+
+    def get_timeline_events(self, user_id: int, case_id: int) -> List:
+        """Get all timeline events for a case, sorted by event_date ASC."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                SELECT doc_id, case_id, filename, parsed_text, uploaded_at,
+                       annotation, event_date, evidence_type, event_title
+                FROM documents
+                WHERE case_id = ?
+                ORDER BY COALESCE(event_date, uploaded_at) ASC
+            """, (case_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_timeline_event_by_id(self, user_id: int, doc_id: int):
+        """Get a single timeline event by doc_id."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                SELECT doc_id, case_id, filename, parsed_text, uploaded_at,
+                       annotation, event_date, evidence_type, event_title
+                FROM documents
+                WHERE doc_id = ?
+            """, (doc_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def update_event_annotation(self, user_id: int, doc_id: int, annotation: str) -> bool:
+        """Update annotation on a document/event."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute(
+                "UPDATE documents SET annotation = ? WHERE doc_id = ?",
+                (annotation, doc_id)
+            )
+            return cursor.rowcount > 0
+
+    def create_timeline_event(self, user_id: int, case_id: int, title: str,
+                               description: str, event_date: str,
+                               evidence_type: str, source_file: str) -> int:
+        """Create a new manual timeline event in the documents table."""
+        with self.get_tenant_conn(user_id) as conn:
+            cursor = conn.execute("""
+                INSERT INTO documents (case_id, filename, parsed_text, event_date, evidence_type, event_title, annotation)
+                VALUES (?, ?, ?, ?, ?, ?, '')
+            """, (case_id, source_file, description, event_date, evidence_type, title))
+            return cursor.lastrowid
 
 
                                                     

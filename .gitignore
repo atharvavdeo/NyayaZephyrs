@@ -66,3 +66,12 @@ htmlcov/
 .vercel
 Zephyrs-ZeroDayPPT.pdf
 *.pdf
+
+Zeroday Brochure.pdf
+ZeroDay PS.pdf
+Participants CF.pdf
+
+# AI Agent & Skills
+.agent/
+skills/
+

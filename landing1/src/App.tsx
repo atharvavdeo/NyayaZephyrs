@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
@@ -10,6 +10,7 @@ import { LanguageProvider, useLanguage } from "./LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { getUserCases, type CaseDetails } from "./api/legalResearcher";
 import { useTheme, getThemeColors } from "./ThemeContext";
+import { UserButton } from "@clerk/clerk-react";
 
 interface Block {
   id: number;
@@ -505,14 +506,9 @@ function TopNavbar({ activePage, onNavigate }: { activePage: "dashboard" | "docu
             </div>
 
             {/* User Profile */}
-            <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[#d4cdb8]">
-              <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">L1</div>
-              <div className="hidden lg:block">
-                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>Lawyer1</p>
-              </div>
-            </div>
+              <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[#d4cdb8]"><UserButton afterSignOutUrl="/" /></div>
 
-            {/* Mobile menu button */}
+              {/* Mobile menu button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="md:hidden p-2 rounded-lg hover:bg-[#e5ddd0] transition-colors"
@@ -553,12 +549,7 @@ function TopNavbar({ activePage, onNavigate }: { activePage: "dashboard" | "docu
               ))}
             </div>
             <div className="mt-3 pt-3 border-t border-[#d4cdb8] flex items-center justify-between">
-              <LanguageSelector />
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-[#d4c4a8] rounded-full flex items-center justify-center text-[#1a1a1a] font-bold text-sm">L1</div>
-                <p className="text-[12px] font-bold text-[#1a1a1a]" style={{ fontFamily: "Montserrat, sans-serif" }}>Lawyer1</p>
-              </div>
-            </div>
+              <LanguageSelector />`n                <div className="flex items-center gap-2">`n                  <UserButton afterSignOutUrl="/" />`n                </div>`n              </div>
           </div>
         )}
       </div>
@@ -642,7 +633,22 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
         console.log("Loaded case data:", caseData);
 
         setSessionId(String(caseId));
-        setMetadata(caseData.structured_data || {});
+        // Map case fields to the metadata format expected by the Document Analysis panel
+        const sd = caseData.structured_data || {};
+        setMetadata({
+          case_title: caseData.client_name + (sd.opposing_party ? ` vs ${sd.opposing_party}` : ""),
+          case_number: `CASE-${caseId}`,
+          doc_type: sd.case_type || caseData.case_type || "Legal Case",
+          court: sd.court || "General Court",
+          judge: sd.judge || "Not specified",
+          appellant: caseData.client_name || sd.appellant || "Not specified",
+          respondent: sd.opposing_party || sd.respondent || "Not specified",
+          detailed_summary: sd.detailed_summary || sd.legal_issue_summary || caseData.legal_issue_summary || "Case loaded. You can now ask questions about this case.",
+          verdict: caseData.stage || sd.verdict || "In Progress",
+          victim: sd.victim || null,
+          facts: sd.facts || null,
+          reasoning: sd.reasoning || null,
+        });
         setFileUrl(null); // No file preview for case-based documents
 
         // Fetch chat history
@@ -720,7 +726,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
         judge: data.structured_data?.judge || "Not specified",
         appellant: data.client_name || "Not specified",
         respondent: data.structured_data?.opposing_party || "Not specified",
-        detailed_summary: data.structured_data?.legal_issue_summary || "Document analyzed successfully. You can now ask questions about this case.",
+        detailed_summary: data.structured_data?.detailed_summary || data.structured_data?.legal_issue_summary || "Document analyzed successfully. You can now ask questions about this case.",
         verdict: data.stage || "In Progress",
         victim: data.structured_data?.victim || null
       });
@@ -733,7 +739,7 @@ function DocumentsPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
 
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Failed to analyze document. Please ensure the backend is running and try again.");
+      alert(error instanceof Error ? error.message : "Failed to analyze document. Please ensure the backend is running and try again.");
       // Keep the file visible even simply for preview
       // setFileUrl(null); 
     } finally {
@@ -1606,26 +1612,7 @@ function DashboardPage({ onNavigate }: { onNavigate: (page: "dashboard" | "docum
               <p className="text-[13px] text-[#666]">Search Indian acts and find applicable legislation for your cases</p>
             </motion.div>
 
-            {/* US Case Law */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ scale: 1.02, y: -5 }}
-              transition={{ duration: 0.5, delay: 0.87 }}
-              onClick={() => onNavigate("legal-researcher")}
-              className="bg-[#f5e6c8]/80 backdrop-blur-sm rounded-xl p-5 shadow-lg border border-[#d4b896]/50 cursor-pointer"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-[#6b5744] rounded-lg flex items-center justify-center">
-                  <span className="text-white text-lg">🇺🇸</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-[#1a1a1a]">US Case Law</h4>
-                  <p className="text-[12px] text-[#666]">Federal Court Opinions</p>
-                </div>
-              </div>
-              <p className="text-[13px] text-[#666]">Search US federal court cases with similar case matching</p>
-            </motion.div>
+            {/* US Case Law - Removed per user request */}
           </div>
         </div>
 
@@ -2771,6 +2758,8 @@ export default function App() {
     </LanguageProvider>
   );
 }
+
+
 
 
 

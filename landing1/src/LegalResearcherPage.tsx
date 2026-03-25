@@ -4,7 +4,6 @@ import { useLanguage } from "./LanguageContext";
 import MultiSourceResearchPanel from "./MultiSourceResearchPanel";
 import EvidencePanel from "./EvidencePanel";
 import ActsAnalysisPanel from "./ActsAnalysisPanel";
-import EvidenceGallery from "./EvidenceGallery";
 import DraftingAssistant from "./DraftingAssistant";
 import {
   getUserCases,
@@ -452,12 +451,6 @@ function CaseDetailView({ caseData, onBack, onDelete, onRefresh }: CaseDetailPro
     }
   };
 
-  useEffect(() => {
-    loadChatHistory();
-    loadSummary();
-    loadResearchHistory();
-  }, [caseData.case_id]);
-
   const loadResearchHistory = async () => {
     try {
       const res = await getCaseResearchHistory(caseData.case_id, DEFAULT_USER_ID);
@@ -466,19 +459,11 @@ function CaseDetailView({ caseData, onBack, onDelete, onRefresh }: CaseDetailPro
         if (latest.results) {
           setResearchResult(latest.results);
         }
-      } else {
-        // No history, run initial research
-        if (!researchResult) handleResearch();
       }
     } catch (e) {
       console.error("Failed to load research history", e);
-      if (!researchResult) handleResearch();
     }
   };
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const loadChatHistory = async () => {
     try {
@@ -503,6 +488,16 @@ function CaseDetailView({ caseData, onBack, onDelete, onRefresh }: CaseDetailPro
       console.error("Failed to load summary", err);
     }
   };
+
+  useEffect(() => {
+    loadChatHistory();
+    loadSummary();
+    loadResearchHistory();
+  }, [caseData.case_id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -1056,17 +1051,34 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [stats, setStats] = useState<{ total_cases: number; total_documents: number; total_chats: number } | null>(null);
 
+  // Load cached data on mount, then fetch fresh data in background
   useEffect(() => {
+    // Try to load from cache first for instant display
+    const cachedCases = sessionStorage.getItem('legal_cases');
+    const cachedStats = sessionStorage.getItem('legal_stats');
+
+    if (cachedCases) {
+      setCases(JSON.parse(cachedCases));
+      setLoading(false);
+    }
+    if (cachedStats) {
+      setStats(JSON.parse(cachedStats));
+    }
+
+    // Then fetch fresh data
     fetchCases();
     fetchStats();
   }, []);
 
   const fetchCases = async () => {
-    setLoading(true);
+    if (!sessionStorage.getItem('legal_cases')) {
+      setLoading(true);
+    }
     try {
       const res = await getUserCases(DEFAULT_USER_ID);
       if (res.success) {
         setCases(res.cases);
+        sessionStorage.setItem('legal_cases', JSON.stringify(res.cases));
       }
     } catch (err) {
       console.error("Failed to fetch cases", err);
@@ -1080,6 +1092,7 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
       const res = await getUserStats(DEFAULT_USER_ID);
       if (res.success && res.stats) {
         setStats(res.stats);
+        sessionStorage.setItem('legal_stats', JSON.stringify(res.stats));
       }
     } catch (err) {
       console.error("Failed to fetch stats", err);
@@ -1195,7 +1208,6 @@ export default function LegalResearcherPage({ onNavigate: _onNavigate }: LegalRe
               />
             ) : (
               <div className="h-full overflow-y-auto">
-                <EvidenceGallery userId={DEFAULT_USER_ID} onNavigateToCase={handleSelectCase} />
                 {loading ? (
                   <div className="text-center py-12 text-[#666]">Loading cases...</div>
                 ) : cases.length === 0 ? (

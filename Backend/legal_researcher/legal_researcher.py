@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+import os
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 """
 This module manages autonomous legal research. It utilizes the Firecrawl API to search authoritative legal sources, scrape relevant case law, and generate summaries for the user.
 """
@@ -7,7 +10,13 @@ import json
 import time
 import re
 from datetime import datetime
-from firecrawl import Firecrawl
+try:
+    from firecrawl import FirecrawlApp as Firecrawl  # v1.0+ uses FirecrawlApp
+except ImportError:
+    try:
+        from firecrawl import Firecrawl  # Fallback for older versions
+    except ImportError:
+        Firecrawl = None  # Will fail gracefully if Firecrawl not installed
 from langchain_groq import ChatGroq
 
                        
@@ -64,7 +73,12 @@ class ClientDB:
                                             
 class LegalResearcher:
     def __init__(self, firecrawl_key, groq_key):
-        self.app = Firecrawl(api_key=firecrawl_key)
+        # Handle case where Firecrawl is not installed
+        if Firecrawl is None:
+            print("⚠️ Firecrawl not installed - legal research will be limited")
+            self.app = None
+        else:
+            self.app = Firecrawl(api_key=firecrawl_key)
         self.last_request_time = 0
                                                                                         
         self.min_interval = 6 
@@ -72,7 +86,7 @@ class LegalResearcher:
                                                   
         self.llm = ChatGroq(
             api_key=groq_key,
-            model_name="llama-3.1-8b-instant",                                   
+            model_name="llama-3.3-70b-versatile",
             temperature=0.3,
             max_tokens=300
         )
@@ -120,6 +134,11 @@ Summary:"""
         """
         Step 1: Search for cases based on the user's description.
         """
+        # Check if Firecrawl is available
+        if self.app is None:
+            print("⚠️ Firecrawl not available - cannot search cases")
+            return []
+        
         self._wait_for_rate_limit()
         
                                         
@@ -162,6 +181,11 @@ Summary:"""
         Step 2: Scrape case texts individually (simpler than batch for credit control).
         """
         if not urls:
+            return []
+        
+        # Check if Firecrawl is available
+        if self.app is None:
+            print("⚠️ Firecrawl not available - cannot fetch case details")
             return []
         
         results = []

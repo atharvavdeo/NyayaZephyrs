@@ -1,3 +1,8 @@
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
 """
 This module defines the FastAPI routes for the Legal AI Platform, handling authentication (JWT), case management, AI chat, and document processing endpoints. It serves as the primary interface for the frontend.
 """
@@ -28,6 +33,8 @@ Usage:
 """
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, Query
+
+
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -38,7 +45,10 @@ import os
 import sys
 import json
 import tempfile
-from PyPDF2 import PdfReader
+import fitz  # PyMuPDF
+import pytesseract
+from PIL import Image
+import io
 from dotenv import load_dotenv
 
 # Load environment variables from .env file before importing other modules
@@ -169,11 +179,12 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-class AuthResponse(BaseModel):
-    success: bool
-    message: str
-    user_id: Optional[int] = None
-    username: Optional[str] = None
+class ClerkSyncRequest(BaseModel):
+    clerk_id: str
+    username: str
+    email: Optional[str] = None
+
+# AuthResponse is imported from jwt_auth module
 
                      
 class ManualCaseCreate(BaseModel):
@@ -225,6 +236,7 @@ class ChatRequest(BaseModel):
     case_id: int
     query: str = Field(..., min_length=1)
     language: str = Field(default="en", description="Language code for translation (e.g., 'es', 'hi', 'fr')")
+    use_neural: bool = Field(default=False, description="Whether to use HuggingFace APIs for neural translation")
 
 class ChatResponse(BaseModel):
     response: str
@@ -251,6 +263,7 @@ class CaseInfo(BaseModel):
     parties: Dict[str, str]
     summary: str
     ai_summary: Optional[str] = None
+    relevance_score: Optional[float] = None
 
 class ResearchResponse(BaseModel):
     success: bool
@@ -260,49 +273,45 @@ class ResearchResponse(BaseModel):
     total_found: int
 
 
-                                                          
+# ====================== AUTHENTICATION ENDPOINTS ======================
 
-@router.post("/auth/register", response_model=AuthResponse)
-async def register_user(request: RegisterRequest):
+@router.post("/auth/clerk-sync")
+async def sync_clerk_user(request_data: ClerkSyncRequest, request: Request):
     """
-    Register a new user account.
-    Password is hashed with bcrypt before storage.
+    Sync a Clerk user to the local database, returning a JWT token for backend auth.
     """
-    if get_db_manager().register_user(request.username, request.password):
-        return AuthResponse(
-            success=True,
-            message=f"Account created for {request.username}",
-            username=request.username
+    db = get_db_manager()
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+
+    user_id = db.sync_clerk_user(request_data.clerk_id, request_data.username, request_data.email)
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to sync Clerk user"
         )
-    raise HTTPException(status_code=400, detail="Username already taken")
+        
+    db.log_audit(
+        user_id=user_id,
+        action="LOGIN_SUCCESS_CLERK",
+        resource_type="auth",
+        ip_address=client_ip,
+        details=f"Clerk user {request_data.username} synced and logged in. IP: {client_ip}, UA: {user_agent}"
+    )
 
+    # Generate JWT token
+    token = create_access_token(
+        data={"sub": request_data.username, "user_id": user_id}
+    )
 
-@router.post("/auth/login", response_model=AuthResponse)
-async def login_user(request: LoginRequest):
-    """
-    Authenticate user and return user_id for session management.
-    """
-    user = get_db_manager().login_user(request.username, request.password)
-    if user:
-        return AuthResponse(
-            success=True,
-            message=f"Welcome back, {request.username}!",
-            user_id=user['user_id'],
-            username=user['username']
-        )
-    raise HTTPException(status_code=401, detail="Invalid credentials")
-
-
-@router.get("/auth/user/{user_id}")
-async def get_user_info(user_id: int):
-    """Get username by user_id."""
-    username = get_db_manager().get_username(user_id)
-    if username != "Unknown":
-        return {"user_id": user_id, "username": username}
-    raise HTTPException(status_code=404, detail="User not found")
-
-
-                                                                        
+    return AuthResponse(
+        token=token,
+        token_type="bearer",
+        user_id=user_id,
+        username=request_data.username,
+        message="Clerk user synced successfully"
+    )
 
 @router.post("/auth/register", response_model=AuthResponse)
 async def register_user(credentials: UserCredentials, request: Request):
@@ -375,6 +384,7 @@ async def login_user(credentials: UserCredentials, request: Request):
     if not user:
                                   
         db.log_audit(
+            user_id=0,  # Use 0 for failed login attempts (no valid user)
             action="LOGIN_FAILED",
             resource_type="auth",
             ip_address=client_ip,
@@ -532,20 +542,29 @@ async def create_case_from_pdf(
     
     try:
                                
-        reader = PdfReader(tmp_path)
+        doc = fitz.open(tmp_path)
         full_text = ""
-        for page in reader.pages:
-            text = page.extract_text() or ""
-            full_text += text + "\n"
+        for page in doc:
+            full_text += page.get_text() + "\n"
+            
+        # Fallback to OCR if PyMuPDF finds little or no text
+        if len(full_text.strip()) < 50:
+            full_text = ""
+            for i, page in enumerate(doc):
+                pix = page.get_pixmap(dpi=150)
+                img = Image.open(io.BytesIO(pix.tobytes()))
+                full_text += pytesseract.image_to_string(img) + "\n"
+                
+        doc.close()
         
-        if len(full_text) < 100:
+        if not full_text.strip():
             raise HTTPException(
                 status_code=400, 
-                detail="Could not extract text from PDF. File may be scanned/image-based."
+                detail="Could not extract text from PDF. File may be empty, scanned or image-based."
             )
         
                                                                        
-        structured_data = get_case_generator().generate_case_structure(full_text[:5000])
+        structured_data = get_case_generator().generate_case_structure(full_text[:35000])
         
         if not structured_data:
             raise HTTPException(status_code=500, detail="AI failed to analyze PDF document")
@@ -586,6 +605,58 @@ async def create_case_from_pdf(
                            
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+@router.post("/documents/reanalyze/{case_id}")
+async def reanalyze_document(case_id: int, user_id: int = Query(1)):
+    """
+    Re-analyses the documents attached to a case to generate a detailed summary.
+    """
+    db = get_db_manager()
+    case = db.get_case(user_id, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+        
+    docs = db.get_case_documents(user_id, case_id)
+    if not docs:
+        raise HTTPException(status_code=400, detail="No documents found for this case to reanalyze")
+        
+    full_text = ""
+    for d in docs:
+        full_text += d['parsed_text'] + "\n\n"
+        
+    # Re-run the RAG generation
+    try:
+        structured_data = get_case_generator().generate_case_structure(full_text[:35000])
+        if not structured_data:
+            raise HTTPException(status_code=500, detail="AI failed to reanalyze document")
+            
+        structured_json = json.dumps(structured_data)
+        
+        # Update case with new structured data
+        with db.get_tenant_conn(user_id) as conn:
+            conn.execute(
+                "UPDATE cases SET structured_data = ? WHERE case_id = ?",
+                (structured_json, case_id)
+            )
+            
+        case_title = case['client_name']
+        if structured_data.get('opposing_party'):
+            case_title += f" vs {structured_data.get('opposing_party')}"
+
+        return {
+            "success": True,
+            "metadata": {
+                "case_title": case_title,
+                "case_number": f"CASE-{case_id}",
+                "doc_type": structured_data.get("case_type", "Legal Case"),
+                "summary": structured_data.get("legal_issue_summary", "Doc Re-Analyzed"),
+                "detailed_summary": structured_data.get("detailed_summary", ""),
+                "key_entities": [structured_data.get("client_name", ""), structured_data.get("opposing_party", "")],
+                "date": structured_data.get("incident_date", "")
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reanalysis failed: {str(e)}")
 
 
 @router.post("/cases/import-kanoon")
@@ -678,15 +749,24 @@ async def search_kanoon(request: SearchKanoonRequest):
         # 2. Fetch details (limit to 3 for speed)
         raw_cases = researcher.get_case_details(urls[:3])
         
-        results = []
+        dict_results = []
         for url, doc in raw_cases:
              md = doc.markdown if hasattr(doc, 'markdown') else ''
              info = researcher.extract_case_info(md, url)
+             dict_results.append(info)
+             
+        from reranker import get_reranker
+        reranker = get_reranker()
+        ranked_dicts = reranker.rank_results(request.query, dict_results, top_k=3)
+        
+        results = []
+        for info in ranked_dicts:
              results.append({
-                 "url": url, 
+                 "url": info.get("url", ""), 
                  "title": info.get("case_title", "Unknown Case"),
                  "date": info.get("date", ""),
-                 "court": info.get("court", "")
+                 "court": info.get("court", ""),
+                 "relevance_score": info.get("relevance_score", 0.0)
              })
              
         return {"results": results}
@@ -872,7 +952,7 @@ async def chat_with_case(request: ChatRequest, user_id: int = Query(..., descrip
                                                
     query_in_english = request.query
     if request.language != 'en':
-        query_in_english = translate_to_english(request.query, source_lang=request.language)
+        query_in_english = translate_to_english(request.query, source_lang=request.language, use_neural=request.use_neural)
     
                                             
                                                            
@@ -895,7 +975,7 @@ async def chat_with_case(request: ChatRequest, user_id: int = Query(..., descrip
                                                           
     final_response = response
     if request.language != 'en':
-        final_response = translate_from_english(response, target_lang=request.language)
+        final_response = translate_from_english(response, target_lang=request.language, use_neural=request.use_neural)
     
     return ChatResponse(response=final_response, case_id=request.case_id, language=request.language)
 
@@ -1015,17 +1095,22 @@ async def conduct_legal_research(request: ResearchRequest):
             )
         
                                      
-        raw_cases = researcher.get_case_details(urls)
+        raw_cases = researcher.get_case_details(urls[:3])
         
                                                         
-        formatted_results = []
+        dict_results = []
         for url, doc in raw_cases:
             md = doc.markdown if hasattr(doc, 'markdown') else ''
             case_info = researcher.extract_case_info(md, url)
-            
-                                 
             case_info["ai_summary"] = researcher.summarize_case(md, case_info['case_title'])
+            dict_results.append(case_info)
             
+        from reranker import get_reranker
+        reranker = get_reranker()
+        ranked_dicts = reranker.rank_results(request.description, dict_results)
+        
+        formatted_results = []
+        for case_info in ranked_dicts:
             formatted_results.append(CaseInfo(
                 url=case_info['url'],
                 case_title=case_info['case_title'],
@@ -1035,7 +1120,8 @@ async def conduct_legal_research(request: ResearchRequest):
                 verdict=case_info['verdict'],
                 parties=case_info['parties'],
                 summary=case_info['summary'],
-                ai_summary=case_info.get('ai_summary')
+                ai_summary=case_info.get('ai_summary'),
+                relevance_score=case_info.get('relevance_score')
             ))
         
                                                 
@@ -1319,15 +1405,23 @@ def create_standalone_app() -> FastAPI:
         app.include_router(evidence_router)
         print("✅ Evidence analysis endpoints loaded")
     except Exception as e:
-        print(f"⚠️ Could not load evidence endpoints: {e}")
+        print(f"Could not load evidence endpoints: {e}")
 
     # Include drafting assistant router
     try:
         from api_drafting import router as drafting_router
-        app.include_router(drafting_router, prefix="/legal/draft", tags=["Drafting Assistant"])
+        app.include_router(drafting_router, prefix="/legal/drafting", tags=["Drafting Assistant"])
         print("✅ Drafting assistant endpoints loaded")
     except Exception as e:
-        print(f"⚠️ Could not load drafting endpoints: {e}")
+        print(f"Could not load drafting endpoints: {e}")
+
+    # Include evidence timeline router
+    try:
+        from api_timeline import router as timeline_router
+        app.include_router(timeline_router)
+        print("✅ Evidence timeline endpoints loaded")
+    except Exception as e:
+        print(f"Could not load timeline endpoints: {e}")
     
     @app.get("/")
     async def root():
