@@ -313,6 +313,7 @@ async def sync_clerk_user(request_data: ClerkSyncRequest, request: Request):
         message="Clerk user synced successfully"
     )
 
+
 @router.post("/auth/register", response_model=AuthResponse)
 async def register_user(credentials: UserCredentials, request: Request):
     """
